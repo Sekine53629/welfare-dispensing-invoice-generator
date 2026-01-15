@@ -1,0 +1,16 @@
+{
+  "workbook": "許認可表書き差込保存マクロ20250829.xlsm",
+  "modules": [
+    "ExcelDocumentModule.bas",
+    "ExcelMappingModule.bas",
+    "ExcelLicenseRenewalController.bas",
+    "TemplateFileMapping.bas",
+    "GetSVMobileNumber.bas",
+    "mod_CSVHandler.bas",
+    "mod_AlertCalculator.bas",
+    "mod_DocumentGenerator.bas",
+    "mod_DatabaseHandler.bas"
+  ],
+  "auto_backup": true,
+  "modules_dir": "modules"
+}

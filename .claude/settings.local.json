@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where /R C:Usersimao3 *調剤券* 2)",
+      "Bash(NUL)",
+      "Bash(dir /S /B C:Usersimao3Documents*.xlsm 2)",
+      "Bash(findstr:*)",
+      "Bash(dir /S /B C:Usersimao3Desktop*.xlsm 2)",
+      "Bash(powershell -Command:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(iconv:*)",
+      "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\\調剤券請求書CSV202502_sjis.csv\")",
+      "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\\test_data_202502_sjis.csv\")",
+      "Bash(dir \"C:\\Users\\imao3\\OneDrive\\画像\\Screenshots\")",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

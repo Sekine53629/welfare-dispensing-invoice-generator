@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>調剤券請求書作成ツール</title>
+    <link rel="stylesheet" href="src/css/main.css">
+    <link rel="stylesheet" href="src/css/components.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <h1>調剤券請求書作成システム</h1>
+            <p class="subtitle">生活保護調剤券 | 旭川市請求業務支援</p>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main-content">
+            <!-- タブナビゲーション -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="invoice">請求書作成</button>
+                <button class="tab-btn" data-tab="settings">設定</button>
+                <button class="tab-btn" data-tab="archive">アーカイブ</button>
+            </nav>
+
+            <!-- タブコンテンツ: 請求書作成 -->
+            <section id="tab-invoice" class="tab-content active">
+                <!-- 初期画面: CSVアップロード -->
+                <div id="upload-view" class="upload-view">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>CSVファイル読み込み</h2>
+                        </div>
+                        <div class="card-body">
+                            <!-- 請求回数選択 -->
+                            <div class="batch-selector">
+                                <label class="radio-label">
+                                    <input type="radio" name="batch" value="1" checked>
+                                    <span class="radio-text">1回目請求（月中・20日前後）</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="batch" value="2">
+                                    <span class="radio-text">2回目請求（月末）- 重複除外</span>
+                                </label>
+                            </div>
+
+                            <!-- ファイルドロップゾーン -->
+                            <div id="drop-zone" class="drop-zone">
+                                <div class="drop-zone-icon">▼</div>
+                                <p class="drop-zone-text">CSVファイルをドラッグ&ドロップ</p>
+                                <p class="drop-zone-subtext">または</p>
+                                <button id="file-select-btn" class="btn btn-primary">ファイルを選択</button>
+                                <input type="file" id="file-input" accept=".csv" style="display: none;">
+                            </div>
+
+                            <!-- プログレスバー -->
+                            <div id="progress-container" style="display: none;">
+                                <div class="progress-bar">
+                                    <div id="progress-fill" class="progress-fill"></div>
+                                </div>
+                                <p id="progress-text" class="progress-text">処理中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- データ表示画面（1画面構成） -->
+                <div id="data-view" class="data-view" style="display: none;">
+                    <!-- ヘッダー情報バー -->
+                    <div class="info-bar">
+                        <div class="info-bar-left">
+                            <div class="file-badge">
+                                📄 <span id="current-file-name">-</span>
+                            </div>
+                            <div class="batch-badge">
+                                <span id="current-batch-label">1回目請求</span>
+                            </div>
+                        </div>
+                        <div class="info-bar-right">
+                            <button id="reset-btn" class="btn btn-secondary btn-small">
+                                🔄 新規作成
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 統計情報（コンパクト） -->
+                    <div class="stats-compact">
+                        <div class="stat-item">
+                            <span class="stat-label-compact">総レコード数</span>
+                            <span id="stat-total" class="stat-value-compact">0</span>
+                        </div>
+                        <div class="stat-item highlight">
+                            <span class="stat-label-compact">請求対象</span>
+                            <span id="stat-target" class="stat-value-compact">0</span>
+                        </div>
+                        <div class="stat-item warning">
+                            <span class="stat-label-compact">重複除外</span>
+                            <span id="stat-duplicate" class="stat-value-compact">0</span>
+                        </div>
+                    </div>
+
+                    <!-- メインコンテンツ -->
+                    <div class="main-layout">
+                        <!-- 左側: 患者リスト -->
+                        <div class="patient-section">
+                            <div class="section-header">
+                                <h2>患者リスト</h2>
+                                <input type="text" id="search-input" class="search-input" placeholder="患者名で検索...">
+                            </div>
+
+                            <div class="table-container">
+                                <table id="patient-table" class="patient-table">
+                                    <thead>
+                                        <tr>
+                                            <th><input type="checkbox" id="select-all" checked></th>
+                                            <th>No</th>
+                                            <th>患者氏名</th>
+                                            <th>カナ</th>
+                                            <th>生年月日</th>
+                                            <th>来局日</th>
+                                            <th>医療機関</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="patient-table-body">
+                                        <!-- 動的に生成 -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- フラグ凡例（コンパクト） -->
+                            <div class="legend-compact">
+                                <span class="badge badge-info">自立</span>=21/15/16
+                                <span class="badge badge-warning">重障</span>=54
+                                <span class="badge badge-success">請求</span>
+                                <span class="badge badge-danger">重複</span>
+                            </div>
+                        </div>
+
+                        <!-- 右側: アクションパネル -->
+                        <div class="action-panel">
+                            <!-- ダウンロードセクション -->
+                            <div class="action-card">
+                                <h3>📥 Excel出力</h3>
+                                <div class="output-info">
+                                    <p>対象患者数: <strong id="output-count">0</strong>件</p>
+                                </div>
+                                <button id="download-excel-btn" class="btn btn-success btn-large btn-full">
+                                    Excelダウンロード
+                                </button>
+                            </div>
+
+                            <!-- 請求先リンク（コンパクト） -->
+                            <div class="action-card">
+                                <h3>🔗 請求先</h3>
+                                <div class="links-compact">
+                                    <a href="https://logoform.jp/form/iLZf/662007" target="_blank" rel="noopener noreferrer" class="link-compact primary">
+                                        📝 電子請求フォーム
+                                    </a>
+                                    <a href="https://logoform.jp/login" target="_blank" rel="noopener noreferrer" class="link-compact">
+                                        🔐 ログイン
+                                    </a>
+                                    <a href="https://www.city.asahikawa.hokkaido.jp/kurashi/135/189/190/d080493.html" target="_blank" rel="noopener noreferrer" class="link-compact">
+                                        📄 案内ページ
+                                    </a>
+                                </div>
+                                <div class="contact-compact">
+                                    <p class="contact-title">📞 お問い合わせ</p>
+                                    <p class="contact-text">生活支援課 医療介護係</p>
+                                    <p class="contact-phone"><a href="tel:0166-25-9121">0166-25-9121</a></p>
+                                </div>
+                            </div>
+
+                            <!-- 注意事項 -->
+                            <div class="action-card warning-card">
+                                <h3>⚠️ 注意事項</h3>
+                                <ul class="notes-list">
+                                    <li>シート名を変更しない</li>
+                                    <li>氏名は姓名間に半角スペース</li>
+                                    <li>再送信時は全患者データ含める</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- タブコンテンツ: 設定 -->
+            <section id="tab-settings" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>薬局情報設定</h2>
+                    </div>
+                    <div class="card-body">
+                        <form id="settings-form">
+                            <div class="form-group">
+                                <label for="pharmacy-name">薬局名 <span class="required">*</span></label>
+                                <input type="text" id="pharmacy-name" class="form-input" placeholder="例: ○○薬局" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="medical-code">医療機関コード（10桁） <span class="required">*</span></label>
+                                <input type="text" id="medical-code" class="form-input" placeholder="例: 0112345678" pattern="[0-9]{10}" maxlength="10" required>
+                                <small class="form-help">半角数字10桁で入力してください</small>
+                            </div>
+                            <div class="button-group">
+                                <button type="submit" class="btn btn-primary">設定を保存</button>
+                                <button type="button" id="clear-settings-btn" class="btn btn-secondary">設定をクリア</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- テンプレート情報 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Excelテンプレート</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-box success">
+                            <p>✅ 旭川市公式テンプレートを使用</p>
+                            <p><strong>tyouzai_excel_v2.xlsx</strong></p>
+                            <small class="form-help">
+                                テンプレートは組み込み済みです。選択の必要はありません。<br>
+                                <a href="https://www.city.asahikawa.hokkaido.jp/kurashi/135/189/190/d080493_d/fil/tyouzai_excel_v2.xlsx" target="_blank" rel="noopener noreferrer">
+                                    公式テンプレートをダウンロード ↗
+                                </a>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 外部リンク -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>旭川市 請求関連リンク</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="external-links">
+                            <div class="link-item">
+                                <div class="link-icon">📄</div>
+                                <div class="link-content">
+                                    <h3>調剤券の電子請求について</h3>
+                                    <p>旭川市の調剤券請求に関する案内ページ（調剤薬局専用）</p>
+                                    <a href="https://www.city.asahikawa.hokkaido.jp/kurashi/135/189/190/d080493.html" target="_blank" rel="noopener noreferrer" class="btn btn-link">
+                                        案内ページを開く ↗
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="link-item">
+                                <div class="link-icon">📝</div>
+                                <div class="link-content">
+                                    <h3>電子請求フォーム</h3>
+                                    <p>旭川市への調剤券電子請求専用フォーム（LoGoフォーム）</p>
+                                    <a href="https://logoform.jp/form/iLZf/662007" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                                        請求フォームを開く ↗
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="link-item">
+                                <div class="link-icon">🔐</div>
+                                <div class="link-content">
+                                    <h3>LoGoフォーム ログイン</h3>
+                                    <p>過去の請求履歴確認・再送信用ログインページ</p>
+                                    <a href="https://logoform.jp/login" target="_blank" rel="noopener noreferrer" class="btn btn-link">
+                                        ログインページを開く ↗
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="contact-info">
+                                <h3>📞 お問い合わせ</h3>
+                                <div class="contact-details">
+                                    <p><strong>旭川市福祉保険部 生活支援課 医療介護係</strong></p>
+                                    <p>〒070-8525 北海道旭川市7条通9丁目48番地 総合庁舎5階</p>
+                                    <p>電話: <a href="tel:0166-25-9121">0166-25-9121</a></p>
+                                </div>
+                            </div>
+
+                            <div class="info-box warning">
+                                <h4>⚠️ 電子請求時の注意事項</h4>
+                                <ul>
+                                    <li>シート名は変更しないでください</li>
+                                    <li>氏名は姓と名の間に半角スペースを入れてください</li>
+                                    <li>再送信の場合は、すべての患者データを含めて送信してください</li>
+                                    <li>請求期限を確認の上、余裕をもって送信してください</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- タブコンテンツ: アーカイブ -->
+            <section id="tab-archive" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>処理履歴・アーカイブ</h2>
+                        <div class="card-header-actions">
+                            <button id="clear-archive-btn" class="btn btn-danger-outline btn-small">全履歴削除</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- アーカイブ検索 -->
+                        <div class="form-group">
+                            <input type="month" id="archive-month-filter" class="form-input">
+                        </div>
+
+                        <!-- アーカイブリスト -->
+                        <div id="archive-list" class="archive-list">
+                            <!-- 動的に生成 -->
+                            <p class="empty-state">処理履歴がありません</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- フッター -->
+        <footer class="app-footer">
+            <p>&copy; 2025 調剤券請求書作成ツール v2.0.0 | MIT License</p>
+            <p>作成者: 関根 sekine53629</p>
+        </footer>
+    </div>
+
+    <!-- モーダル: エラー表示 -->
+    <div id="error-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header error">
+                <h3>エラー</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="error-message">エラーが発生しました</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary modal-close-btn">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- モーダル: 成功表示 -->
+    <div id="success-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header success">
+                <h3>完了</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="success-message">処理が完了しました</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary modal-close-btn">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScriptモジュール -->
+    <script type="module" src="src/js/app.js"></script>
+</body>
+</html>

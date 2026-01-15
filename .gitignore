@@ -54,3 +54,12 @@ Thumbs.db
 # Database
 *.db
 *.sqlite
+
+# アーカイブデータ（個人情報保護）
+*/archive/**
+!*/archive/.gitkeep
+vba-version/archive/**
+webapp-version/archive/**
+
+# 実データ（個人情報）
+**/real-data/**
