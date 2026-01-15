@@ -13,7 +13,21 @@
       "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\\調剤券請求書CSV202502_sjis.csv\")",
       "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\\test_data_202502_sjis.csv\")",
       "Bash(dir \"C:\\Users\\imao3\\OneDrive\\画像\\Screenshots\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dir \"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\")",
+      "Bash(dir /B \"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\sample\" 2)",
+      "Bash(node:*)",
+      "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\standalone-app\\template_base64.txt\")",
+      "Bash(dir:*)",
+      "Bash(npm install:*)",
+      "Bash(python:*)",
+      "Bash(template-data.js)",
+      "Bash(del:*)",
+      "Bash(\"C:\\Users\\imao3\\Documents\\GitHub\\welfare-dispensing-invoice-generator\\docs\\SPECIFICATION.md\")",
+      "Bash(echo:*)",
+      "Bash(awk:*)",
+      "Bash(zip:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File create-standalone-zip.ps1)"
     ],
     "deny": [],
     "ask": []

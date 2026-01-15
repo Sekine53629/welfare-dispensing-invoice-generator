@@ -36,25 +36,65 @@ export async function generateExcel(patients, config, templateBuffer = null) {
   // データ転記開始行
   const START_ROW = 11;
 
+  // 患者データをグループ化（同一患者の複数来局日を統合）
+  const groupedPatients = groupPatientsByRecipient(patients);
+
   // 患者データを転記
-  patients.forEach((patient, index) => {
+  groupedPatients.forEach((patientGroup, index) => {
     const rowNum = START_ROW + index;
     const row = worksheet.getRow(rowNum);
 
-    // 列の配置（テンプレートに合わせる）
-    row.getCell(2).value = config.pharmacyName; // 薬局名
-    row.getCell(3).value = removeLeading01(config.medicalCode); // 薬局医療機関コード
-    row.getCell(4).value = patient.medicalInstitution; // 診療医療機関名
-    row.getCell(5).value = patient.medicalCode; // 診療医療機関コード
-    row.getCell(6).value = patient.recipientNumber; // 受給者番号
-    row.getCell(7).value = patient.patientName; // 患者氏名
-    row.getCell(8).value = patient.patientKana; // 患者カナ氏名
-    row.getCell(9).value = patient.birthDate; // 生年月日
-    row.getCell(10).value = patient.treatmentDate; // 診療年月日
+    // 代表データ（最初のレコード）
+    const patient = patientGroup.records[0];
 
-    // フラグ
-    row.getCell(12).value = patient.hasJiritsuShien ? '◯' : ''; // 自立支援
-    row.getCell(13).value = patient.hasJusho ? '◯' : ''; // 重障
+    // B列: 薬局名
+    row.getCell(2).value = config.pharmacyName || '';
+
+    // C列: 薬局医療機関コード（下8桁、文字列として代入）
+    const pharmacyCodeCell = row.getCell(3);
+    pharmacyCodeCell.value = formatMedicalCode(config.medicalCode);
+    pharmacyCodeCell.numFmt = '@'; // テキスト形式
+
+    // D列: 診療医療機関名
+    row.getCell(4).value = removeAllQuotes(patient.medicalInstitution);
+
+    // E列: 診療医療機関コード（下8桁、文字列として代入）
+    const medicalCodeCell = row.getCell(5);
+    medicalCodeCell.value = formatMedicalCode(patient.medicalCode);
+    medicalCodeCell.numFmt = '@'; // テキスト形式
+
+    // 受給者番号（文字列、シングルクォート完全除去）
+    const recipientCell = row.getCell(6);
+    recipientCell.value = removeAllQuotes(patient.recipientNumber);
+    recipientCell.numFmt = '@'; // テキスト形式
+
+    // 患者氏名（シングルクォート削除）
+    row.getCell(7).value = removeAllQuotes(patient.patientName);
+
+    // 患者カナ氏名（シングルクォート削除）
+    row.getCell(8).value = removeAllQuotes(patient.patientKana);
+
+    // 生年月日（日付として代入）
+    const birthDateCell = row.getCell(9);
+    birthDateCell.value = parseJapaneseDate(patient.birthDate);
+    birthDateCell.numFmt = 'yyyy/mm/dd';
+
+    // 診療年月日（複数来局日を統合）
+    const treatmentDateCell = row.getCell(10);
+    treatmentDateCell.value = formatMultipleTreatmentDates(patientGroup.treatmentDates);
+    treatmentDateCell.numFmt = '@'; // テキスト形式（複数日の場合があるため）
+
+    // 公費フラグ判定
+    const kohiFlags = detectKohiFlags(patient.publicCodes);
+
+    // K列: 自立支援（公費21/15/16）
+    row.getCell(11).value = kohiFlags.hasJiritsuShien ? '◯' : '';
+
+    // L列: 重障（公費54）
+    row.getCell(12).value = kohiFlags.hasJusho ? '◯' : '';
+
+    // M列: その他（予備）
+    row.getCell(13).value = '';
 
     row.commit();
   });
@@ -189,6 +229,221 @@ export async function excelToCSV(excelBlob) {
   });
 
   return csvLines.join('\n');
+}
+
+/**
+ * 医療機関コードをフォーマット（下8桁を文字列として取得）
+ * @param {string} code - 医療機関コード
+ * @returns {string} フォーマット済みコード
+ */
+function formatMedicalCode(code) {
+  if (!code) return '';
+
+  // シングルクォートと前後の空白を削除
+  let cleaned = removeAllQuotes(String(code).trim());
+
+  // 先頭の01を削除
+  cleaned = removeLeading01(cleaned);
+
+  // 下8桁を取得
+  if (cleaned.length > 8) {
+    cleaned = cleaned.slice(-8);
+  }
+
+  return cleaned;
+}
+
+/**
+ * すべてのシングルクォート・ダブルクォートを削除
+ * @param {string} str - 文字列
+ * @returns {string} クリーニング済み文字列
+ */
+function removeAllQuotes(str) {
+  if (!str) return '';
+  return String(str).replace(/['"`]/g, '');
+}
+
+/**
+ * 日本の日付文字列をDate型に変換
+ * @param {string} dateStr - 日付文字列（例: '2025/02/15', 'R7/2/15'）
+ * @returns {Date|string} Date型または元の文字列
+ */
+function parseJapaneseDate(dateStr) {
+  if (!dateStr) return '';
+
+  // すでにDate型の場合
+  if (dateStr instanceof Date) return dateStr;
+
+  const str = String(dateStr).trim();
+
+  // YYYY/MM/DD形式のチェック
+  const westernMatch = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (westernMatch) {
+    const [_, year, month, day] = westernMatch;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+
+  // 令和（R）形式のチェック（例: R7/2/15 → 2025/2/15）
+  const reiwaMatch = str.match(/^R(\d{1,2})\/(\d{1,2})\/(\d{1,2})$/);
+  if (reiwaMatch) {
+    const [_, reiwaYear, month, day] = reiwaMatch;
+    const year = parseInt(reiwaYear) + 2018; // 令和元年 = 2019年
+    return new Date(year, parseInt(month) - 1, parseInt(day));
+  }
+
+  // 平成（H）形式のチェック（例: H31/4/30 → 2019/4/30）
+  const heiseiMatch = str.match(/^H(\d{1,2})\/(\d{1,2})\/(\d{1,2})$/);
+  if (heiseiMatch) {
+    const [_, heiseiYear, month, day] = heiseiMatch;
+    const year = parseInt(heiseiYear) + 1988; // 平成元年 = 1989年
+    return new Date(year, parseInt(month) - 1, parseInt(day));
+  }
+
+  // パースできない場合は元の文字列を返す
+  return str;
+}
+
+/**
+ * YYYYMMDD形式の日付文字列をDate型に変換
+ * @param {string} dateStr - YYYYMMDD形式の日付文字列（例: '20250210'）
+ * @returns {Date|string} Date型または元の文字列
+ */
+function parseYYYYMMDD(dateStr) {
+  if (!dateStr) return '';
+
+  // すでにDate型の場合
+  if (dateStr instanceof Date) return dateStr;
+
+  // シングルクォートと空白を削除
+  const cleaned = removeAllQuotes(String(dateStr).trim());
+
+  // YYYYMMDD形式のチェック（例: '20250210'）
+  const match = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
+
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // JavaScriptの月は0-indexed
+    const day = parseInt(match[3], 10);
+    return new Date(year, month, day);
+  }
+
+  // パースできない場合は元の文字列を返す
+  return cleaned;
+}
+
+/**
+ * 患者データを受給者番号でグループ化（複数来局日を統合）
+ * @param {Array<PatientData>} patients - 患者データ配列
+ * @returns {Array<Object>} グループ化されたデータ
+ */
+function groupPatientsByRecipient(patients) {
+  const groups = new Map();
+
+  patients.forEach(patient => {
+    const key = `${patient.recipientNumber}_${patient.patientName}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        records: [],
+        treatmentDates: []
+      });
+    }
+
+    const group = groups.get(key);
+    group.records.push(patient);
+
+    // 診療年月日を追加（重複排除）
+    const dateStr = patient.treatmentDate;
+    if (dateStr && !group.treatmentDates.includes(dateStr)) {
+      group.treatmentDates.push(dateStr);
+    }
+  });
+
+  return Array.from(groups.values());
+}
+
+/**
+ * 複数の診療年月日をフォーマット（YYYYMMDD形式対応）
+ * @param {Array<string>} dates - 日付配列（YYYYMMDD形式: '20250210'）
+ * @returns {string} フォーマット済み文字列（例: '2025/2(7,10,25)'）
+ */
+function formatMultipleTreatmentDates(dates) {
+  if (!dates || dates.length === 0) return '';
+
+  // 日付をDate型に変換してソート
+  const parsedDates = dates
+    .map(d => {
+      const parsed = parseYYYYMMDD(d); // YYYYMMDD形式をパース
+      return {
+        original: d,
+        date: parsed instanceof Date ? parsed : null,
+        str: d
+      };
+    })
+    .filter(d => d.date !== null)
+    .sort((a, b) => a.date - b.date);
+
+  if (parsedDates.length === 0) {
+    // パースできない日付の場合はカンマ区切りで返す
+    return dates.join(', ');
+  }
+
+  if (parsedDates.length === 1) {
+    // 1つだけの場合は通常の日付形式
+    const d = parsedDates[0].date;
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  // 複数の場合は「YYYY/M(D,D,D)」形式
+  const firstDate = parsedDates[0].date;
+  const year = firstDate.getFullYear();
+  const month = firstDate.getMonth() + 1;
+
+  // 同じ年月かチェック
+  const allSameYearMonth = parsedDates.every(d =>
+    d.date.getFullYear() === year && d.date.getMonth() + 1 === month
+  );
+
+  if (allSameYearMonth) {
+    const days = parsedDates.map(d => d.date.getDate()).join(',');
+    return `${year}/${month}(${days})`;
+  } else {
+    // 異なる年月が混在する場合はカンマ区切り
+    return parsedDates.map(d => {
+      const date = d.date;
+      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+    }).join(', ');
+  }
+}
+
+/**
+ * 公費コードから各フラグを判定
+ * @param {Array<string>} publicCodes - 公費コード配列
+ * @returns {Object} フラグオブジェクト {hasJiritsuShien, hasJusho}
+ */
+function detectKohiFlags(publicCodes) {
+  const flags = {
+    hasJiritsuShien: false, // 自立支援（21/15/16）
+    hasJusho: false         // 重障（54）
+  };
+
+  if (!publicCodes || publicCodes.length === 0) return flags;
+
+  publicCodes.forEach(code => {
+    const cleaned = String(code).trim();
+
+    // 自立支援: 21（精神通院）、15（更生医療）、16（育成医療）
+    if (cleaned === '21' || cleaned === '15' || cleaned === '16') {
+      flags.hasJiritsuShien = true;
+    }
+
+    // 重障: 54（難病）
+    if (cleaned === '54') {
+      flags.hasJusho = true;
+    }
+  });
+
+  return flags;
 }
 
 export default {

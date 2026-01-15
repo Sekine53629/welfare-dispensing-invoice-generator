@@ -10,17 +10,19 @@
 
 /**
  * カナ文字・記号の変換処理
- * - シングルクォート削除
+ * - すべてのクォート削除（シングル、ダブル、バッククォート）
  * - 括弧の置換 ( → / , ) → 削除
  * - 半角カナ → 全角カナ変換
  * @param {string} inputStr - 入力文字列
  * @returns {string} 変換済み文字列
  */
 export function fixKana(inputStr) {
-  let result = inputStr;
+  if (!inputStr) return '';
 
-  // シングルクォート削除
-  result = result.replace(/'/g, '');
+  let result = String(inputStr);
+
+  // すべてのクォート文字を削除（シングル、ダブル、バッククォート）
+  result = result.replace(/['"`]/g, '');
 
   // 括弧処理
   result = result.replace(/\(/g, '/');
@@ -38,7 +40,9 @@ export function fixKana(inputStr) {
  * @returns {string} トリム済み文字列
  */
 export function trimSpaces(inputStr) {
-  let result = inputStr;
+  if (!inputStr) return '';
+
+  let result = String(inputStr);
 
   // 先頭・末尾の空白削除
   result = result.trim();
@@ -55,6 +59,7 @@ export function trimSpaces(inputStr) {
  * @returns {string} 変換・トリム済み文字列
  */
 export function fixKanaAndTrim(inputStr) {
+  if (!inputStr) return '';
   return trimSpaces(fixKana(inputStr));
 }
 

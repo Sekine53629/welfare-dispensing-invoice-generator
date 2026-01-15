@@ -103,10 +103,12 @@ export class CSVRecord {
   }
 
   /**
-   * 診療年月日を取得
+   * 診療年月日を取得（YYYYMMDD形式）
    * @returns {string}
    */
   getTreatmentDate() {
+    // 列56: 最終受診日 (YYYYMMDD format: '20250210')
+    // VBA implementation uses column 56 (Module1.bas line 171)
     return this.getField(56);
   }
 
@@ -126,17 +128,23 @@ export class CSVRecord {
  * @returns {Promise<Array<CSVRecord>>} パース済みレコード配列
  */
 export async function parseCSVFile(file, options = {}) {
+  // STEP 1: ファイルをテキストとして読み込み
+  const text = await readFileAsText(file, 'Shift-JIS');
+
+  // STEP 2: 前処理：不完全なシングルクォートを削除
+  const cleanedText = preprocessCSVText(text);
+
+  // STEP 3: Papa Parseでパース
   return new Promise((resolve, reject) => {
     const config = {
       // Papa Parse 設定
       delimiter: ',',
       newline: '\r\n',
-      quoteChar: "'",
-      escapeChar: "'",
+      quoteChar: '"',        // ダブルクォート（シングルクォートは前処理で削除済み）
+      escapeChar: '"',
       header: false,
       dynamicTyping: false,
       preview: 0,
-      encoding: 'Shift-JIS',
       worker: false,
       comments: false,
       step: undefined,
@@ -158,9 +166,25 @@ export async function parseCSVFile(file, options = {}) {
       ...options,
     };
 
-    // ファイル読み込み
-    Papa.parse(file, config);
+    // 前処理済みテキストをパース
+    Papa.parse(cleanedText, config);
   });
+}
+
+/**
+ * CSVテキストの前処理：不完全なシングルクォートを削除
+ * @param {string} text - CSV生テキスト
+ * @returns {string} クリーニング済みテキスト
+ */
+function preprocessCSVText(text) {
+  if (!text) return '';
+
+  // すべてのシングルクォート（'）を削除
+  // 理由：実際のCSVでは不完全なクォート（開始なし・終了のみ）が存在し、
+  //       Papa Parseが誤ってフィールドを結合してしまうため
+  let cleaned = text.replace(/'/g, '');
+
+  return cleaned;
 }
 
 /**
@@ -214,13 +238,15 @@ function processCSVResults(results) {
  * @returns {string} クリーニング済み文字列
  */
 function cleanField(fieldValue) {
-  let result = fieldValue;
+  if (!fieldValue) return '';
+
+  let result = String(fieldValue);
+
+  // すべてのクォート文字を削除（シングル、ダブル、バッククォート）
+  result = result.replace(/['"`]/g, '');
 
   // 先頭・末尾の空白削除
   result = result.trim();
-
-  // シングルクォート削除
-  result = result.replace(/'/g, '');
 
   return result;
 }

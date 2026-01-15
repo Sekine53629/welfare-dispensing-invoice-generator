@@ -1,0 +1,1238 @@
+/**
+ * ============================================================================
+ * 生活保護調剤券請求書作成ツール - スタンドアロン版
+ * Version: 2.0.0
+ * Description: インストール不要、ブラウザで完結する請求書作成ツール
+ * ============================================================================
+ */
+
+// グローバル変数
+let currentCSVFile = null;
+let currentRecords = [];
+let currentFilteredPatients = null;
+let currentBatchNumber = 1;
+const ASAHIKAWA_INSURER_NUMBERS = ['12016010', '12012019'];
+
+// テンプレートファイルは template-data.js から読み込み（TEMPLATE_BASE64定数）
+
+/**
+ * ============================================================================
+ * 初期化
+ * ============================================================================
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    setupEventListeners();
+
+    // テンプレートデータ読み込み確認
+    if (typeof TEMPLATE_BASE64 !== 'undefined') {
+        console.log('✅ テンプレートデータ読み込み成功:', TEMPLATE_BASE64.substring(0, 50) + '...');
+    } else {
+        console.error('❌ テンプレートデータが読み込まれていません');
+    }
+
+    console.log('アプリケーション起動完了');
+});
+
+/**
+ * イベントリスナー設定
+ */
+function setupEventListeners() {
+    // タブ切り替え
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    // ファイル選択
+    document.getElementById('file-select-btn').addEventListener('click', () => {
+        document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', handleFileSelect);
+
+    // ドラッグ&ドロップ
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleFileDrop);
+
+    // 請求回数選択
+    document.querySelectorAll('input[name="batch"]').forEach((radio) => {
+        radio.addEventListener('change', (e) => {
+            currentBatchNumber = parseInt(e.target.value);
+        });
+    });
+
+    // Excelダウンロード
+    document.getElementById('download-excel-btn').addEventListener('click', handleExcelDownload);
+
+    // リセット
+    document.getElementById('reset-btn').addEventListener('click', handleReset);
+
+    // 設定保存
+    document.getElementById('settings-form').addEventListener('submit', handleSettingsSave);
+    document.getElementById('clear-settings-btn').addEventListener('click', handleSettingsClear);
+
+    // テンプレートファイル選択（廃止：組み込みテンプレートを使用）
+    // document.getElementById('template-file-input').addEventListener('change', handleTemplateFileSelect);
+
+    // アーカイブクリア
+    document.getElementById('clear-archive-btn').addEventListener('click', handleArchiveClear);
+
+    // モーダルクローズ
+    document.querySelectorAll('.modal-close').forEach((btn) => {
+        btn.addEventListener('click', closeAllModals);
+    });
+
+    // 全選択/全解除
+    document.getElementById('select-all').addEventListener('change', handleSelectAll);
+}
+
+/**
+ * タブ切り替え
+ */
+function switchTab(tabName) {
+    // タブボタンの切り替え
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+    // タブコンテンツの切り替え
+    document.querySelectorAll('.tab-content').forEach((content) => {
+        content.classList.remove('active');
+        content.style.display = 'none';
+    });
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    targetTab.classList.add('active');
+    targetTab.style.display = 'block';
+
+    // アーカイブタブの場合、履歴を表示
+    if (tabName === 'archive') {
+        displayArchiveList();
+    }
+}
+
+/**
+ * ============================================================================
+ * ファイル処理
+ * ============================================================================
+ */
+
+/**
+ * ファイル選択処理
+ */
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+        processCSVFile(file);
+    }
+}
+
+/**
+ * ドラッグオーバー処理
+ */
+function handleDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+/**
+ * ドラッグリーブ処理
+ */
+function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+/**
+ * ファイルドロップ処理
+ */
+function handleFileDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+        processCSVFile(file);
+    } else {
+        showError('CSVファイルを選択してください');
+    }
+}
+
+/**
+ * CSVファイル処理
+ */
+async function processCSVFile(file) {
+    try {
+        currentCSVFile = file;
+
+        showProgress('CSVファイルを解析中...', 0);
+
+        // CSV解析
+        const records = await parseCSVFile(file);
+        currentRecords = records;
+
+        updateProgress('データをフィルタリング中...', 30);
+
+        // データフィルタリング
+        const filterResult = filterPatients(records, currentBatchNumber);
+        currentFilteredPatients = filterResult;
+
+        updateProgress('完了', 100);
+        hideProgress();
+
+        // 画面切り替え
+        document.getElementById('upload-view').style.display = 'none';
+        document.getElementById('data-view').style.display = 'block';
+
+        // ヘッダー情報更新
+        document.getElementById('current-file-name').textContent = currentCSVFile.name;
+        document.getElementById('current-batch-label').textContent =
+            currentBatchNumber === 1 ? '1回目請求' : '2回目請求（重複除外）';
+
+        // 統計情報表示
+        displayStatistics(filterResult);
+
+        // 患者リスト表示
+        displayPatientList(filterResult.target);
+
+        // 出力件数更新
+        updateOutputCount();
+
+    } catch (error) {
+        hideProgress();
+        console.error('CSV処理エラー:', error);
+        showError(`CSVファイルの処理中にエラーが発生しました:\n${error.message}\n\nブラウザのコンソールで詳細を確認してください（F12キー）`);
+    }
+}
+
+/**
+ * CSVパース（Shift-JIS対応）
+ */
+async function parseCSVFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const codes = new Uint8Array(e.target.result);
+
+                // encoding-japaneseでShift-JISをUnicodeに変換
+                const detectedEncoding = Encoding.detect(codes);
+                console.log('検出されたエンコーディング:', detectedEncoding);
+
+                const unicodeArray = Encoding.convert(codes, {
+                    to: 'UNICODE',
+                    from: detectedEncoding || 'SJIS'
+                });
+
+                // Unicodeバイト配列を文字列に変換
+                const text = Encoding.codeToString(unicodeArray);
+                console.log('変換後のテキスト（最初の100文字）:', text.substring(0, 100));
+
+                // 前処理：不完全なシングルクォートを削除
+                // 理由：CSVには不完全なクォート（開始なし・終了のみ）が存在し、
+                //       Papa Parseが誤ってフィールドを結合してしまうため
+                const cleanedText = text.replace(/'/g, '');
+                console.log('クォート削除後のテキスト（最初の100文字）:', cleanedText.substring(0, 100));
+
+                // Papa Parseで解析
+                Papa.parse(cleanedText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    delimiter: ',',
+                    quoteChar: '"',        // ダブルクォート（シングルクォートは前処理で削除済み）
+                    escapeChar: '"',
+                    complete: (results) => {
+                        if (results.errors.length > 0) {
+                            console.warn('CSV解析警告:', results.errors);
+                        }
+                        console.log('CSV解析完了:', results.data.length, '件');
+                        console.log('最初の行:', results.data[0]);
+                        resolve(results.data);
+                    },
+                    error: (error) => {
+                        console.error('CSV解析エラー:', error);
+                        reject(error);
+                    }
+                });
+            } catch (error) {
+                console.error('エンコーディング変換エラー:', error);
+                reject(error);
+            }
+        };
+
+        reader.onerror = () => {
+            reject(new Error('ファイル読み込みエラー'));
+        };
+
+        // バイナリとして読み込み（Shift-JIS対応のため）
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+/**
+ * ============================================================================
+ * データフィルタリング
+ * ============================================================================
+ */
+
+/**
+ * 患者データフィルタリング
+ */
+function filterPatients(records, batchNumber) {
+    console.log('フィルタリング開始:', records.length, '件');
+
+    const patients = records.map(row => createPatientData(row));
+    console.log('患者データ作成完了:', patients.length, '件');
+
+    // 旭川市フィルタリング
+    const asahikawa = patients.filter(patient => {
+        const insurerNumber = patient.insurerNumber || '';
+        const address = patient.address || '';
+
+        // 保険者番号チェック（優先）
+        if (ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber)) {
+            patient.isAsahikawa = true;
+            return true;
+        }
+
+        // 住所チェック（フォールバック）
+        if (address.includes('旭川市')) {
+            patient.isAsahikawa = true;
+            return true;
+        }
+
+        patient.isAsahikawa = false;
+        return false;
+    });
+
+    console.log('旭川市抽出:', asahikawa.length, '件');
+
+    let target = asahikawa;
+    let duplicate = [];
+
+    // 2回目請求の場合、重複除外
+    if (batchNumber === 2) {
+        const processedKeys = getProcessedKeysForMonth();
+        target = asahikawa.filter(patient => {
+            const uniqueKey = `${patient.recipientNumber}_${patient.treatmentDate}_${patient.patientName}`;
+            if (processedKeys.has(uniqueKey)) {
+                patient.isDuplicate = true;
+                duplicate.push(patient);
+                return false;
+            }
+            return true;
+        });
+    }
+
+    return {
+        all: patients,
+        asahikawa: asahikawa,
+        target: target,
+        duplicate: duplicate
+    };
+}
+
+/**
+ * 患者データ作成
+ * CSVファイルの列構造に基づく（1行目: 列番号, 2行目以降: データ）
+ */
+function createPatientData(row) {
+    // デバッグ: 最初の行のキーを表示
+    if (!createPatientData.keysLogged) {
+        console.log('CSVのカラム:', Object.keys(row));
+        console.log('サンプルデータ:', row);
+        createPatientData.keysLogged = true;
+    }
+
+    // CSV列番号でアクセス（Papa Parse headerモードでは1行目が列名になる）
+    // 1行目が "1", "2", "3", ... "70" の場合、row["10"]でアクセス
+    const patientName = fixKanaAndTrim(row['10'] || '');     // 10列目: 患者氏名
+    const patientKana = fixKanaAndTrim(row['11'] || '');     // 11列目: 患者カナ氏名
+    const birthDate = row['12'] || '';                        // 12列目: 生年月日
+    const medicalInstitution = fixKanaAndTrim(row['34'] || ''); // 34列目: 医療機関名
+    const medicalCode = fixKanaAndTrim(row['65'] || '');     // 65列目: 医療機関コード
+    const address = fixKanaAndTrim(row['38'] || '');         // 38列目: 住所
+    const treatmentDate = row['56'] || '';                    // 56列目: 診療年月日
+    const recipientNumber = fixKanaAndTrim(row['58'] || ''); // 58列目: 受給者番号
+    const insurerNumber = fixKanaAndTrim(row['23'] || '');   // 23列目: 保険者番号
+    const publicExpenseNumber1 = row['22'] || '';             // 22列目: 第一公費種別番号
+    const publicExpenseNumber2 = row['26'] || '';             // 26列目: 第二公費種別番号
+    const publicExpenseNumber3 = row['30'] || '';             // 30列目: 第三公費種別番号
+
+    const patient = {
+        recipientNumber: recipientNumber,
+        patientName: patientName,
+        patientKana: patientKana,
+        birthDate: birthDate,
+        treatmentDate: treatmentDate,
+        medicalInstitution: medicalInstitution,
+        medicalCode: removeLeading01(medicalCode),  // 医療機関コード（先頭01削除）
+        publicExpenseNumber1: publicExpenseNumber1,
+        publicExpenseNumber2: publicExpenseNumber2,
+        publicExpenseNumber3: publicExpenseNumber3,
+        address: address,
+        insurerNumber: insurerNumber,
+        isAsahikawa: false,
+        isDuplicate: false,
+        isIncluded: true,
+        otherKohiList: []
+    };
+
+    // 他公費検出
+    detectOtherKohi(patient);
+
+    return patient;
+}
+
+/**
+ * 他公費検出
+ */
+function detectOtherKohi(patient) {
+    const kohiMap = {
+        '21': '精',
+        '15': '更',
+        '16': '育',
+        '54': '難'
+    };
+
+    // 3つの公費番号をチェック
+    [patient.publicExpenseNumber1, patient.publicExpenseNumber2, patient.publicExpenseNumber3].forEach(kohiNum => {
+        if (kohiMap[kohiNum]) {
+            patient.otherKohiList.push(kohiMap[kohiNum]);
+        }
+    });
+}
+
+/**
+ * 全角カナ変換・トリム
+ */
+function fixKanaAndTrim(str) {
+    if (!str) return '';
+    return str.replace(/[ｦ-ﾟ]/g, (char) => {
+        return String.fromCharCode(char.charCodeAt(0) + 0xFEE0);
+    }).trim();
+}
+
+/**
+ * 医療機関コードの先頭「01」を削除
+ * @param {string} code - 医療機関コード
+ * @returns {string} 処理済みコード
+ */
+function removeLeading01(code) {
+    if (!code) return '';
+    const str = String(code).trim();
+    if (str.startsWith('01')) {
+        return str.substring(2);
+    }
+    return str;
+}
+
+/**
+ * 処理済みキー取得（2回目請求用）
+ */
+function getProcessedKeysForMonth() {
+    const archived = JSON.parse(localStorage.getItem('processed-keys') || '[]');
+    return new Set(archived);
+}
+
+/**
+ * 処理済みキー保存
+ */
+function saveProcessedKeys(patients) {
+    const keys = patients.map(p => `${p.recipientNumber}_${p.treatmentDate}_${p.patientName}`);
+    const existing = JSON.parse(localStorage.getItem('processed-keys') || '[]');
+    const merged = [...new Set([...existing, ...keys])];
+    localStorage.setItem('processed-keys', JSON.stringify(merged));
+}
+
+/**
+ * ============================================================================
+ * 表示処理
+ * ============================================================================
+ */
+
+/**
+ * 統計情報表示
+ */
+function displayStatistics(filterResult) {
+    const stats = {
+        total: filterResult.all.length,
+        target: filterResult.target.length,
+        duplicate: filterResult.duplicate.length
+    };
+
+    document.getElementById('stat-total').textContent = stats.total;
+    document.getElementById('stat-target').textContent = stats.target;
+    document.getElementById('stat-duplicate').textContent = stats.duplicate;
+}
+
+/**
+ * 患者リスト表示
+ */
+function displayPatientList(patients) {
+    const tbody = document.getElementById('patient-table-body');
+    tbody.innerHTML = '';
+
+    patients.forEach((patient, index) => {
+        const row = document.createElement('tr');
+
+        // 他公費ありの場合、背景色変更
+        if (patient.otherKohiList.length > 0) {
+            row.classList.add('has-other-kohi');
+        }
+
+        // 重複の場合
+        if (patient.isDuplicate) {
+            row.classList.add('duplicate');
+        }
+
+        // バッジ生成
+        let badges = '';
+        patient.otherKohiList.forEach(kohi => {
+            badges += `<span class="badge badge-warning">${kohi}</span>`;
+        });
+        if (!patient.isDuplicate) {
+            badges += '<span class="badge badge-success">請求</span>';
+        } else {
+            badges += '<span class="badge badge-danger">重複</span>';
+        }
+
+        row.innerHTML = `
+            <td><input type="checkbox" class="patient-checkbox" data-index="${index}" ${patient.isIncluded ? 'checked' : ''}></td>
+            <td>${index + 1}</td>
+            <td>${patient.recipientNumber}</td>
+            <td>${patient.patientName}</td>
+            <td>${patient.birthDate}</td>
+            <td>${patient.treatmentDate}</td>
+            <td>${patient.medicalInstitution}</td>
+            <td>${badges}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+
+    // チェックボックスイベント設定
+    document.querySelectorAll('.patient-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleCheckboxChange);
+    });
+}
+
+/**
+ * 全選択/全解除処理
+ */
+function handleSelectAll(e) {
+    const checked = e.target.checked;
+    document.querySelectorAll('.patient-checkbox').forEach(checkbox => {
+        checkbox.checked = checked;
+        const index = parseInt(checkbox.dataset.index);
+        if (currentFilteredPatients && currentFilteredPatients.target[index]) {
+            currentFilteredPatients.target[index].isIncluded = checked;
+        }
+    });
+    updateOutputCount();
+}
+
+/**
+ * チェックボックス変更処理
+ */
+function handleCheckboxChange(e) {
+    const index = parseInt(e.target.dataset.index);
+    const checked = e.target.checked;
+
+    if (currentFilteredPatients && currentFilteredPatients.target[index]) {
+        currentFilteredPatients.target[index].isIncluded = checked;
+    }
+
+    updateOutputCount();
+}
+
+/**
+ * 出力件数更新
+ */
+function updateOutputCount() {
+    if (!currentFilteredPatients) return;
+
+    const includedCount = currentFilteredPatients.target.filter(p => p.isIncluded !== false).length;
+    document.getElementById('output-count').textContent = includedCount;
+}
+
+/**
+ * ============================================================================
+ * Excel生成
+ * ============================================================================
+ */
+
+/**
+ * Excelダウンロード処理
+ */
+async function handleExcelDownload() {
+    try {
+        if (!currentFilteredPatients || currentFilteredPatients.target.length === 0) {
+            showError('請求対象の患者データがありません');
+            return;
+        }
+
+        // チェックONの患者のみ抽出
+        const includedPatients = currentFilteredPatients.target.filter(p => p.isIncluded !== false);
+
+        if (includedPatients.length === 0) {
+            showError('請求対象の患者が選択されていません');
+            return;
+        }
+
+        showProgress('Excelファイルを生成中...', 0);
+
+        // テンプレート取得
+        updateProgress('テンプレートを読み込み中...', 20);
+        const templateBuffer = await loadTemplate();
+
+        updateProgress('データを書き込み中...', 50);
+
+        // Excel生成
+        const excelBlob = await generateExcel(includedPatients, templateBuffer);
+
+        updateProgress('完了', 100);
+        hideProgress();
+
+        // ファイル名生成
+        const fileName = generateFileName(includedPatients, currentBatchNumber);
+
+        // ダウンロード
+        downloadBlob(excelBlob, fileName);
+
+        // 処理済みキー保存（1回目のみ）
+        if (currentBatchNumber === 1) {
+            saveProcessedKeys(includedPatients);
+        }
+
+        // アーカイブ保存
+        saveArchive(includedPatients, fileName);
+
+        showSuccess(`Excelファイルを生成しました（${includedPatients.length}件）`);
+
+    } catch (error) {
+        hideProgress();
+        console.error('Excel生成エラー:', error);
+        console.error('エラースタック:', error.stack);
+        showError(`Excelファイルの生成中にエラーが発生しました:\n${error.message}\n\nエラー詳細はコンソールを確認してください（F12キー）`);
+    }
+}
+
+/**
+ * テンプレート読み込み（ハードコーディングされたBase64から読み込み）
+ */
+async function loadTemplate() {
+    if (typeof TEMPLATE_BASE64 === 'undefined') {
+        throw new Error('テンプレートデータが見つかりません。template-data.jsが読み込まれていることを確認してください。');
+    }
+
+    console.log('組み込みテンプレートを読み込み中...');
+
+    // Base64をArrayBufferに変換
+    const binaryString = atob(TEMPLATE_BASE64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    console.log('テンプレート読み込み成功: クリーン版テンプレート');
+    return bytes.buffer;
+}
+
+/**
+ * Excel生成（テンプレート使用）
+ */
+async function generateExcel(patients, templateBuffer) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(templateBuffer);
+
+    const worksheet = workbook.worksheets[0];
+
+    console.log('患者データ書き込み中...');
+
+    // 薬局名と医療機関コードを設定から取得
+    const pharmacyName = localStorage.getItem('pharmacy-name') || '';
+    const medicalCode = localStorage.getItem('medical-code') || '';
+
+    // 患者データをグループ化（同一患者の複数来局日を統合）
+    const groupedPatients = groupPatientsByRecipient(patients);
+
+    // 患者データ書き込み（11行目から開始）
+    groupedPatients.forEach((patientGroup, index) => {
+        const rowNum = 11 + index;
+        const row = worksheet.getRow(rowNum);
+
+        // 代表データ（最初のレコード）
+        const patient = patientGroup.records[0];
+
+        // A列: 番号
+        row.getCell(1).value = index + 1;
+
+        // B列: 薬局名
+        row.getCell(2).value = pharmacyName || '';
+
+        // C列: 薬局医療機関コード（下8桁、文字列として代入）
+        const pharmacyCodeCell = row.getCell(3);
+        pharmacyCodeCell.value = formatMedicalCode(medicalCode);
+        pharmacyCodeCell.numFmt = '@'; // テキスト形式
+
+        // D列: 診療医療機関名
+        row.getCell(4).value = removeAllQuotes(patient.medicalInstitution);
+
+        // E列: 診療医療機関コード（下8桁、文字列として代入）
+        const medicalCodeCell = row.getCell(5);
+        medicalCodeCell.value = formatMedicalCode(patient.medicalCode);
+        medicalCodeCell.numFmt = '@'; // テキスト形式
+
+        // F列: 受給者番号（文字列、シングルクォート完全除去）
+        const recipientCell = row.getCell(6);
+        recipientCell.value = removeAllQuotes(patient.recipientNumber);
+        recipientCell.numFmt = '@'; // テキスト形式
+
+        // G列: 患者氏名（シングルクォート削除）
+        row.getCell(7).value = removeAllQuotes(patient.patientName);
+
+        // H列: 患者カナ氏名（シングルクォート削除）
+        row.getCell(8).value = removeAllQuotes(patient.patientKana);
+
+        // I列: 生年月日（日付として代入）
+        const birthDateCell = row.getCell(9);
+        birthDateCell.value = parseJapaneseDate(patient.birthDate);
+        birthDateCell.numFmt = 'yyyy/mm/dd';
+
+        // J列: 診療年月日（複数来局日を統合）
+        const treatmentDateCell = row.getCell(10);
+        treatmentDateCell.value = formatMultipleTreatmentDates(patientGroup.treatmentDates);
+        treatmentDateCell.numFmt = '@'; // テキスト形式（複数日の場合があるため）
+
+        // 公費フラグ判定
+        const kohiFlags = detectKohiFlags(patient.publicCodes);
+
+        // K列: 空白（予備）
+        row.getCell(11).value = '';
+
+        // L列: 自立支援（公費21/15/16）
+        row.getCell(12).value = kohiFlags.hasJiritsuShien ? '◯' : '';
+
+        // M列: 重障（公費54）
+        row.getCell(13).value = kohiFlags.hasJusho ? '◯' : '';
+
+        row.commit();
+    });
+
+    console.log('Excel生成完了');
+    // Blob生成
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+}
+
+/**
+ * ファイル名生成
+ */
+function generateFileName(patients, batchNumber) {
+    const pharmacyName = localStorage.getItem('pharmacy-name') || '薬局';
+    const treatmentDate = patients[0]?.treatmentDate || '';
+
+    // 年月を取得（treatmentDateが空の場合は現在の年月を使用）
+    let yearMonth = '';
+    if (treatmentDate) {
+        yearMonth = treatmentDate.substring(0, 7).replace('/', '').replace('-', '');
+    } else {
+        const now = new Date();
+        yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const batchLabel = batchNumber === 1 ? '1回目' : '2回目';
+
+    return `調剤券_旭川市_${yearMonth}_${pharmacyName}_${batchLabel}.xlsx`;
+}
+
+/**
+ * ============================================================================
+ * ユーティリティ
+ * ============================================================================
+ */
+
+/**
+ * Blobダウンロード
+ */
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * リセット処理
+ */
+function handleReset() {
+    if (confirm('データをクリアして新規作成しますか？')) {
+        document.getElementById('file-input').value = '';
+        document.getElementById('data-view').style.display = 'none';
+        document.getElementById('upload-view').style.display = 'block';
+        document.getElementById('patient-table-body').innerHTML = '';
+
+        currentCSVFile = null;
+        currentRecords = [];
+        currentFilteredPatients = null;
+    }
+}
+
+/**
+ * プログレスバー表示
+ */
+function showProgress(text, percent) {
+    document.getElementById('progress-container').style.display = 'block';
+    document.getElementById('progress-text').textContent = text;
+    document.getElementById('progress-fill').style.width = `${percent}%`;
+}
+
+/**
+ * プログレスバー更新
+ */
+function updateProgress(text, percent) {
+    document.getElementById('progress-text').textContent = text;
+    document.getElementById('progress-fill').style.width = `${percent}%`;
+}
+
+/**
+ * プログレスバー非表示
+ */
+function hideProgress() {
+    setTimeout(() => {
+        document.getElementById('progress-container').style.display = 'none';
+    }, 500);
+}
+
+/**
+ * エラーモーダル表示
+ */
+function showError(message) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-modal').style.display = 'flex';
+}
+
+/**
+ * 成功モーダル表示
+ */
+function showSuccess(message) {
+    document.getElementById('success-message').textContent = message;
+    document.getElementById('success-modal').style.display = 'flex';
+}
+
+/**
+ * すべてのモーダルを閉じる
+ */
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
+
+/**
+ * ============================================================================
+ * 設定管理
+ * ============================================================================
+ */
+
+/**
+ * 設定読み込み
+ */
+function loadSettings() {
+    const pharmacyName = localStorage.getItem('pharmacy-name') || '';
+    const medicalCode = localStorage.getItem('medical-code') || '';
+
+    document.getElementById('pharmacy-name').value = pharmacyName;
+    document.getElementById('medical-code').value = medicalCode;
+
+    // テンプレートファイルは組み込みのため、ステータス初期化不要
+}
+
+/**
+ * 設定保存
+ */
+function handleSettingsSave(e) {
+    e.preventDefault();
+
+    const pharmacyName = document.getElementById('pharmacy-name').value.trim();
+    const medicalCode = document.getElementById('medical-code').value.trim();
+
+    if (!pharmacyName) {
+        showError('薬局名は必須です');
+        return;
+    }
+
+    if (medicalCode && !/^\d{10}$/.test(medicalCode)) {
+        showError('医療機関コードは10桁の数字で入力してください');
+        return;
+    }
+
+    localStorage.setItem('pharmacy-name', pharmacyName);
+    localStorage.setItem('medical-code', medicalCode);
+
+    showSuccess('設定を保存しました');
+}
+
+/**
+ * 設定クリア
+ */
+function handleSettingsClear() {
+    if (confirm('設定をクリアしますか？')) {
+        localStorage.removeItem('pharmacy-name');
+        localStorage.removeItem('medical-code');
+
+        document.getElementById('pharmacy-name').value = '';
+        document.getElementById('medical-code').value = '';
+
+        // テンプレートファイルは組み込みのため、クリア不要
+
+        showSuccess('設定をクリアしました');
+    }
+}
+
+/**
+ * テンプレートファイル選択（廃止：組み込みテンプレートを使用）
+ */
+// function handleTemplateFileSelect() は削除されました
+// テンプレートはtemplate-data.jsから読み込まれます
+
+/**
+ * ============================================================================
+ * アーカイブ管理
+ * ============================================================================
+ */
+
+/**
+ * アーカイブ保存
+ */
+function saveArchive(patients, fileName) {
+    try {
+        console.log('アーカイブ保存開始');
+        console.log('currentCSVFile:', currentCSVFile);
+        console.log('fileName:', fileName);
+
+        const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+
+        // currentCSVFileが存在するか確認
+        const csvFileName = (currentCSVFile && currentCSVFile.name) ? currentCSVFile.name : '-';
+        console.log('csvFileName:', csvFileName);
+
+        const archive = {
+            id: Date.now().toString(),
+            timestamp: new Date().toISOString(),
+            fileName: fileName,
+            csvFileName: csvFileName,
+            batchNumber: currentBatchNumber,
+            patientCount: patients.length,
+            pharmacyName: localStorage.getItem('pharmacy-name') || '薬局'
+        };
+
+        archives.unshift(archive);
+
+        // 最新50件のみ保持
+        if (archives.length > 50) {
+            archives.splice(50);
+        }
+
+        localStorage.setItem('archives', JSON.stringify(archives));
+        console.log('アーカイブ保存完了:', archive);
+
+    } catch (error) {
+        console.error('アーカイブ保存失敗:', error);
+        console.error('エラースタック:', error.stack);
+    }
+}
+
+/**
+ * アーカイブ一覧表示
+ */
+function displayArchiveList() {
+    const listContainer = document.getElementById('archive-list');
+    const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+
+    if (archives.length === 0) {
+        listContainer.innerHTML = '<div class="archive-empty">📦 処理履歴はありません</div>';
+        return;
+    }
+
+    listContainer.innerHTML = archives.map(archive => {
+        const date = new Date(archive.timestamp);
+        const dateStr = date.toLocaleString('ja-JP');
+
+        return `
+            <div class="archive-item">
+                <div class="archive-info">
+                    <div class="archive-title">${archive.fileName}</div>
+                    <div class="archive-meta">
+                        📅 ${dateStr} |
+                        📄 ${archive.csvFileName} |
+                        ${archive.batchNumber === 1 ? '1回目' : '2回目'}請求 |
+                        ${archive.patientCount}件
+                    </div>
+                </div>
+                <div class="archive-actions">
+                    <button class="btn btn-danger btn-small" onclick="deleteArchive('${archive.id}')">
+                        削除
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * アーカイブ削除
+ */
+function deleteArchive(id) {
+    if (confirm('この履歴を削除しますか？')) {
+        const archives = JSON.parse(localStorage.getItem('archives') || '[]');
+        const filtered = archives.filter(a => a.id !== id);
+        localStorage.setItem('archives', JSON.stringify(filtered));
+        displayArchiveList();
+        showSuccess('履歴を削除しました');
+    }
+}
+
+/**
+ * アーカイブ全クリア
+ */
+function handleArchiveClear() {
+    if (confirm('すべての処理履歴をクリアしますか？この操作は取り消せません。')) {
+        localStorage.removeItem('archives');
+        localStorage.removeItem('processed-keys');
+        displayArchiveList();
+        showSuccess('すべての処理履歴をクリアしました');
+    }
+}
+
+/**
+ * ============================================================================
+ * Excel生成ヘルパー関数（webapp版と同じ実装）
+ * ============================================================================
+ */
+
+/**
+ * 医療機関コードをフォーマット（下8桁を文字列として取得）
+ * @param {string} code - 医療機関コード
+ * @returns {string} フォーマット済みコード
+ */
+function formatMedicalCode(code) {
+    if (!code) return '';
+
+    // シングルクォートと前後の空白を削除
+    let cleaned = removeAllQuotes(String(code).trim());
+
+    // 先頭の01を削除
+    if (cleaned.startsWith('01')) {
+        cleaned = cleaned.substring(2);
+    }
+
+    // 下8桁を取得
+    if (cleaned.length > 8) {
+        cleaned = cleaned.slice(-8);
+    }
+
+    return cleaned;
+}
+
+/**
+ * すべてのシングルクォート・ダブルクォートを削除
+ * @param {string} str - 文字列
+ * @returns {string} クリーニング済み文字列
+ */
+function removeAllQuotes(str) {
+    if (!str) return '';
+    return String(str).replace(/['"`]/g, '');
+}
+
+/**
+ * 日本の日付文字列をDate型に変換
+ * @param {string} dateStr - 日付文字列（例: '2025/02/15', 'R7/2/15'）
+ * @returns {Date|string} Date型または元の文字列
+ */
+function parseJapaneseDate(dateStr) {
+    if (!dateStr) return '';
+
+    // すでにDate型の場合
+    if (dateStr instanceof Date) return dateStr;
+
+    const str = String(dateStr).trim();
+
+    // YYYY/MM/DD形式のチェック
+    const westernMatch = str.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    if (westernMatch) {
+        const [_, year, month, day] = westernMatch;
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+
+    // 令和（R）形式のチェック（例: R7/2/15 → 2025/2/15）
+    const reiwaMatch = str.match(/^R(\d{1,2})\/(\d{1,2})\/(\d{1,2})$/);
+    if (reiwaMatch) {
+        const [_, reiwaYear, month, day] = reiwaMatch;
+        const year = parseInt(reiwaYear) + 2018; // 令和元年 = 2019年
+        return new Date(year, parseInt(month) - 1, parseInt(day));
+    }
+
+    // 平成（H）形式のチェック（例: H31/4/30 → 2019/4/30）
+    const heiseiMatch = str.match(/^H(\d{1,2})\/(\d{1,2})\/(\d{1,2})$/);
+    if (heiseiMatch) {
+        const [_, heiseiYear, month, day] = heiseiMatch;
+        const year = parseInt(heiseiYear) + 1988; // 平成元年 = 1989年
+        return new Date(year, parseInt(month) - 1, parseInt(day));
+    }
+
+    // パースできない場合は元の文字列を返す
+    return str;
+}
+
+/**
+ * YYYYMMDD形式の日付文字列をDate型に変換
+ * @param {string} dateStr - YYYYMMDD形式の日付文字列（例: '20250210'）
+ * @returns {Date|string} Date型または元の文字列
+ */
+function parseYYYYMMDD(dateStr) {
+    if (!dateStr) return '';
+
+    // すでにDate型の場合
+    if (dateStr instanceof Date) return dateStr;
+
+    // シングルクォートと空白を削除
+    const cleaned = removeAllQuotes(String(dateStr).trim());
+
+    // YYYYMMDD形式のチェック（例: '20250210'）
+    const match = cleaned.match(/^(\d{4})(\d{2})(\d{2})$/);
+
+    if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // JavaScriptの月は0-indexed
+        const day = parseInt(match[3], 10);
+        return new Date(year, month, day);
+    }
+
+    // パースできない場合は元の文字列を返す
+    return cleaned;
+}
+
+/**
+ * 患者データを受給者番号でグループ化（複数来局日を統合）
+ * @param {Array} patients - 患者データ配列
+ * @returns {Array} グループ化されたデータ
+ */
+function groupPatientsByRecipient(patients) {
+    const groups = new Map();
+
+    patients.forEach(patient => {
+        const key = `${patient.recipientNumber}_${patient.patientName}`;
+
+        if (!groups.has(key)) {
+            groups.set(key, {
+                records: [],
+                treatmentDates: []
+            });
+        }
+
+        const group = groups.get(key);
+        group.records.push(patient);
+
+        // 診療年月日を追加（重複排除）
+        const dateStr = patient.treatmentDate;
+        if (dateStr && !group.treatmentDates.includes(dateStr)) {
+            group.treatmentDates.push(dateStr);
+        }
+    });
+
+    return Array.from(groups.values());
+}
+
+/**
+ * 複数の診療年月日をフォーマット（YYYYMMDD形式対応）
+ * @param {Array<string>} dates - 日付配列（YYYYMMDD形式: '20250210'）
+ * @returns {string} フォーマット済み文字列（例: '2025/2(7,10,25)'）
+ */
+function formatMultipleTreatmentDates(dates) {
+    if (!dates || dates.length === 0) return '';
+
+    // 日付をDate型に変換してソート
+    const parsedDates = dates
+        .map(d => {
+            const parsed = parseYYYYMMDD(d); // YYYYMMDD形式をパース
+            return {
+                original: d,
+                date: parsed instanceof Date ? parsed : null,
+                str: d
+            };
+        })
+        .filter(d => d.date !== null)
+        .sort((a, b) => a.date - b.date);
+
+    if (parsedDates.length === 0) {
+        // パースできない日付の場合はカンマ区切りで返す
+        return dates.join(', ');
+    }
+
+    if (parsedDates.length === 1) {
+        // 1つだけの場合は通常の日付形式
+        const d = parsedDates[0].date;
+        return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    // 複数の場合は「YYYY/M(D,D,D)」形式
+    const firstDate = parsedDates[0].date;
+    const year = firstDate.getFullYear();
+    const month = firstDate.getMonth() + 1;
+
+    // 同じ年月かチェック
+    const allSameYearMonth = parsedDates.every(d =>
+        d.date.getFullYear() === year && d.date.getMonth() + 1 === month
+    );
+
+    if (allSameYearMonth) {
+        const days = parsedDates.map(d => d.date.getDate()).join(',');
+        return `${year}/${month}(${days})`;
+    } else {
+        // 異なる年月が混在する場合はカンマ区切り
+        return parsedDates.map(d => {
+            const date = d.date;
+            return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+        }).join(', ');
+    }
+}
+
+/**
+ * 公費コードから各フラグを判定
+ * @param {Array<string>} publicCodes - 公費コード配列
+ * @returns {Object} フラグオブジェクト {hasJiritsuShien, hasJusho}
+ */
+function detectKohiFlags(publicCodes) {
+    const flags = {
+        hasJiritsuShien: false, // 自立支援（21/15/16）
+        hasJusho: false         // 重障（54）
+    };
+
+    if (!publicCodes || publicCodes.length === 0) return flags;
+
+    publicCodes.forEach(code => {
+        const cleaned = String(code).trim();
+
+        // 自立支援: 21（精神通院）、15（更生医療）、16（育成医療）
+        if (cleaned === '21' || cleaned === '15' || cleaned === '16') {
+            flags.hasJiritsuShien = true;
+        }
+
+        // 重障: 54（難病）
+        if (cleaned === '54') {
+            flags.hasJusho = true;
+        }
+    });
+
+    return flags;
+}
