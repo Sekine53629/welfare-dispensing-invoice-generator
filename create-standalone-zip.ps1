@@ -1,9 +1,9 @@
 # スタンドアロン版ZIPパッケージ作成スクリプト
-# Version: 2.1.0
+# Version: 2.3.6
 
 $source = "standalone-app"
-$dest = "welfare-invoice-generator-standalone-v2.1.0-clean"
-$zipPath = "welfare-invoice-generator-standalone-v2.1.0.zip"
+$dest = "welfare-invoice-generator-standalone-v2.3.6-clean"
+$zipPath = "welfare-invoice-generator-standalone-v2.3.6.zip"
 
 Write-Host "=== スタンドアロン版ZIPパッケージ作成 ===" -ForegroundColor Green
 
@@ -20,6 +20,8 @@ Copy-Item "$source\index.html" -Destination $dest
 Copy-Item "$source\app.js" -Destination $dest
 Copy-Item "$source\template-data.js" -Destination $dest
 Copy-Item "$source\README.md" -Destination $dest
+Copy-Item "$source\MANUAL.html" -Destination $dest
+Copy-Item "$source\photo" -Destination "$dest\photo" -Recurse
 
 # コピーされたファイル一覧表示
 Write-Host "`nコピーされたファイル:" -ForegroundColor Cyan

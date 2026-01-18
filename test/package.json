@@ -1,0 +1,14 @@
+{
+  "name": "welfare-invoice-generator-tests",
+  "version": "2.3.6",
+  "description": "Test suite for welfare dispensing invoice generator",
+  "scripts": {
+    "test": "node --test test-unit.js",
+    "test:integration": "node --test test-integration.js",
+    "test:all": "npm test && npm run test:integration"
+  },
+  "keywords": ["test", "invoice", "welfare"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {}
+}

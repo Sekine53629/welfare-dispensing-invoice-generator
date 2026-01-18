@@ -27,7 +27,14 @@
       "Bash(echo:*)",
       "Bash(awk:*)",
       "Bash(zip:*)",
-      "Bash(powershell -ExecutionPolicy Bypass -File create-standalone-zip.ps1)"
+      "Bash(powershell -ExecutionPolicy Bypass -File create-standalone-zip.ps1)",
+      "Bash(powershell:*)",
+      "Bash(npm test)",
+      "Bash(npm run test:integration:*)",
+      "Bash(npm run test:all:*)",
+      "Bash(rd /S /Q temp-check-v2.3.1 2)",
+      "Bash(copy temp-template.xlsx temp-template.zip)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

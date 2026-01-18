@@ -80,13 +80,6 @@
             border-bottom: 3px solid var(--color-primary);
             padding: var(--spacing) var(--spacing-lg);
             box-shadow: var(--shadow-sm);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .app-header-content {
-            flex: 1;
         }
 
         .app-header h1 {
@@ -99,37 +92,6 @@
             font-size: 0.875rem;
             color: var(--color-gray-700);
             margin-top: 0.25rem;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: var(--spacing-sm);
-            align-items: center;
-        }
-
-        .btn-manual {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: var(--color-info);
-            color: white;
-            text-decoration: none;
-            border-radius: var(--radius);
-            font-weight: 500;
-            transition: all 0.2s;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .btn-manual:hover {
-            background: var(--color-primary-dark);
-            box-shadow: var(--shadow-md);
-            transform: translateY(-1px);
-        }
-
-        .btn-manual svg {
-            width: 20px;
-            height: 20px;
         }
 
         /* ============================================================================
@@ -534,6 +496,11 @@
             color: #991b1b;
         }
 
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
         .legend {
             margin-top: var(--spacing);
             padding: var(--spacing-sm);
@@ -926,23 +893,8 @@
         }
 
         @media (max-width: 768px) {
-            .app-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: var(--spacing);
-            }
-
             .app-header h1 {
                 font-size: 1.25rem;
-            }
-
-            .header-actions {
-                width: 100%;
-            }
-
-            .btn-manual {
-                width: 100%;
-                justify-content: center;
             }
 
             .stats-compact {
@@ -970,24 +922,66 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ============================================================================
+         * Previous Month Section (v2.3.0)
+         * ============================================================================ */
+        .previous-month-section {
+            margin: var(--spacing-lg) 0;
+            padding: var(--spacing);
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-gray-300);
+            border-radius: var(--radius);
+        }
+
+        .previous-month-header {
+            margin-bottom: var(--spacing);
+        }
+
+        .previous-month-header h3 {
+            margin: 0 0 var(--spacing-xs) 0;
+            font-size: 1.1rem;
+            color: var(--color-primary);
+        }
+
+        .help-text {
+            margin: 0;
+            font-size: 0.875rem;
+            color: var(--color-gray-700);
+        }
+
+        .previous-month-upload {
+            margin-top: var(--spacing);
+        }
+
+        .previous-month-data-section {
+            margin-top: var(--spacing-lg);
+            padding-top: var(--spacing-lg);
+            border-top: 2px dashed var(--color-gray-300);
+        }
+
+        .previous-month-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing);
+        }
+
+        .previous-month-header-bar h2 {
+            margin: 0;
+            color: var(--color-info);
+        }
+
+        .stat-item.success {
+            border-left: 3px solid var(--color-success);
+        }
     </style>
 </head>
 <body>
     <!-- ヘッダー -->
     <header class="app-header">
-        <div class="app-header-content">
-            <h1>調剤券請求書作成システム</h1>
-            <p class="subtitle">生活保護調剤券 | 旭川市請求業務支援 - スタンドアロン版 v2.3.6</p>
-        </div>
-        <div class="header-actions">
-            <a href="./MANUAL.html" target="_blank" rel="noopener noreferrer" class="btn-manual">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                </svg>
-                操作マニュアル
-            </a>
-        </div>
+        <h1>調剤券請求書作成システム</h1>
+        <p class="subtitle">生活保護調剤券 | 旭川市請求業務支援 - スタンドアロン版</p>
     </header>
 
     <main class="main-content">
@@ -1028,15 +1022,6 @@
                         <input type="file" id="file-input" accept=".csv" style="display: none;">
                     </div>
 
-                    <!-- 前月分CSV追加 (v2.3.0) -->
-                    <div id="previous-month-upload-section" style="display: none; margin-top: 16px;">
-                        <button id="add-previous-month-btn" class="btn btn-secondary">
-                            📅 前月分CSVを追加
-                        </button>
-                        <input type="file" id="previous-csv-input" accept=".csv" style="display: none;">
-                        <p id="previous-month-status" style="margin-top: 8px; font-size: 0.9em; color: var(--color-info);"></p>
-                    </div>
-
                     <!-- プログレスバー -->
                     <div id="progress-container" style="display: none;">
                         <div class="progress-bar">
@@ -1070,16 +1055,30 @@
             <!-- 統計情報 -->
             <div class="stats-compact">
                 <div class="stat-item">
-                    <span class="stat-label-compact">総レコード数</span>
+                    <span class="stat-label-compact">全レコード数</span>
                     <span id="stat-total" class="stat-value-compact">0</span>
                 </div>
                 <div class="stat-item highlight">
-                    <span class="stat-label-compact">請求対象</span>
+                    <span class="stat-label-compact">旭川市抽出</span>
                     <span id="stat-target" class="stat-value-compact">0</span>
                 </div>
                 <div class="stat-item warning">
-                    <span class="stat-label-compact">重複除外</span>
+                    <span class="stat-label-compact">うち重複</span>
                     <span id="stat-duplicate" class="stat-value-compact">0</span>
+                </div>
+            </div>
+
+            <!-- 前月分追加ボタン（v2.3.0） -->
+            <div id="previous-month-upload-section" class="previous-month-section" style="display: none;">
+                <div class="previous-month-header">
+                    <h3>📅 前月分データ追加（月遅れ請求）</h3>
+                    <p class="help-text">前月分のCSVファイルを追加で読み込み、未請求分を当月請求に含めます。</p>
+                </div>
+                <div class="previous-month-upload">
+                    <input type="file" id="previous-csv-input" accept=".csv" style="display: none;">
+                    <button id="add-previous-month-btn" class="btn btn-primary">
+                        📂 前月分CSVを追加
+                    </button>
                 </div>
             </div>
 
@@ -1127,6 +1126,68 @@
                         <span class="badge badge-warning">難</span>=54(難病)
                         <span class="badge badge-success">請求</span>=請求対象
                         <span class="badge badge-danger">重複</span>=重複除外
+                    </div>
+
+                    <!-- 前月分データ表示セクション（v2.3.0） -->
+                    <div id="previous-month-data-section" class="previous-month-data-section" style="display: none;">
+                        <div class="section-header previous-month-header-bar">
+                            <h2>📅 前月分データ（月遅れ請求）</h2>
+                            <button id="toggle-previous-month" class="btn btn-small btn-secondary">
+                                ▼ 折りたたむ
+                            </button>
+                        </div>
+
+                        <div id="previous-month-stats" class="stats-compact">
+                            <div class="stat-item">
+                                <span class="stat-label-compact">前月全件数</span>
+                                <span id="stat-previous-total" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item highlight">
+                                <span class="stat-label-compact">旭川市抽出</span>
+                                <span id="stat-previous-asahikawa" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item warning">
+                                <span class="stat-label-compact">うち重複</span>
+                                <span id="stat-previous-duplicate" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item success">
+                                <span class="stat-label-compact">未請求分</span>
+                                <span id="stat-previous-unbilled" class="stat-value-compact">0</span>
+                            </div>
+                        </div>
+
+                        <div class="select-all-container">
+                            <label>
+                                <input type="checkbox" id="select-all-previous">
+                                全選択/全解除（前月分）
+                            </label>
+                        </div>
+
+                        <div id="previous-month-table-container" class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">✓</th>
+                                        <th>No.</th>
+                                        <th>受給者番号</th>
+                                        <th>氏名</th>
+                                        <th>生年月日</th>
+                                        <th>調剤年月日</th>
+                                        <th>医療機関</th>
+                                        <th>フラグ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previous-month-table-body">
+                                    <!-- JavaScriptで動的生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="legend">
+                            <strong>前月分:</strong>
+                            <span class="badge badge-info">未請求</span>=当月請求可能
+                            <span class="badge badge-danger">重複</span>=既に請求済み
+                        </div>
                     </div>
                 </div>
 

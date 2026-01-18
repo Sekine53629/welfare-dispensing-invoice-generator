@@ -74,7 +74,27 @@ export class PatientData {
  * @returns {Array<PatientData>}
  */
 export function convertToPatientData(records) {
-  return records.map(record => new PatientData(record));
+  // HR形式対応: ヘッダー行をスキップ
+  // - 「項目解析結果」行（行8）
+  // - 薬局情報ヘッダー行（1列目が非データ）
+  const dataRecords = records.filter(record => {
+    const firstField = (record.getField(1) || '').toString().trim();
+
+    // 項目解析結果行を除外
+    if (firstField === '項目解析結果') return false;
+
+    // 空行を除外
+    if (firstField === '') return false;
+
+    // データ行は元号形式で始まる（R1, H31, S64など）
+    // または数字のみ（テスト用マスキングデータ）
+    const isEraFormat = /^[RHS]\d+/.test(firstField);  // R1, H31, S64
+    const isNumericOnly = /^\d+$/.test(firstField);     // 1, 2, 3 (テスト用)
+
+    return isEraFormat || isNumericOnly;
+  });
+
+  return dataRecords.map(record => new PatientData(record));
 }
 
 /**

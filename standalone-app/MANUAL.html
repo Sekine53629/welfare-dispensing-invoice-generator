@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>調剤券請求書作成ツール 操作マニュアル</title>
+    <style>
+        @media print {
+            @page {
+                size: A4;
+                margin: 20mm 15mm;
+            }
+            .no-print {
+                display: none;
+            }
+            body {
+                font-size: 9.5pt;
+                line-height: 1.6;
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
+            h1 {
+                page-break-before: always;
+                page-break-after: avoid;
+                margin-top: 0;
+                font-size: 16pt;
+            }
+            h1:first-of-type {
+                page-break-before: avoid;
+            }
+            h2 {
+                page-break-after: avoid;
+                margin-top: 20px;
+                font-size: 13pt;
+            }
+            h3 {
+                page-break-after: avoid;
+                font-size: 11pt;
+            }
+            .cover {
+                page-break-after: always;
+                padding: 150px 0;
+            }
+            .toc {
+                page-break-after: always;
+            }
+            .step {
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+            .image-container {
+                page-break-inside: avoid;
+                page-break-before: auto;
+                margin: 15px 0;
+            }
+            .image-container + h3,
+            .image-container + .step {
+                page-break-before: avoid;
+            }
+            img {
+                max-width: 100%;
+                max-height: 400px;
+                page-break-inside: avoid;
+            }
+            .warning, .note {
+                page-break-inside: avoid;
+            }
+            table {
+                page-break-inside: avoid;
+                font-size: 9pt;
+            }
+            ul, ol {
+                page-break-inside: avoid;
+            }
+        }
+
+        body {
+            font-family: "メイリオ", "Meiryo", "ヒラギノ角ゴ Pro", "Hiragino Kaku Gothic Pro", sans-serif;
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c5282;
+            border-bottom: 3px solid #5b8fa3;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+
+        h2 {
+            color: #4a6278;
+            border-left: 5px solid #5b8fa3;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+
+        h3 {
+            color: #4a6278;
+            margin-top: 20px;
+        }
+
+        .cover {
+            text-align: center;
+            padding: 100px 0;
+            border-bottom: 3px solid #5b8fa3;
+        }
+
+        .cover h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            border: none;
+        }
+
+        .cover .version {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .cover .date {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 30px 0;
+        }
+
+        .toc h2 {
+            margin-top: 0;
+            border: none;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .toc li {
+            margin: 10px 0;
+        }
+
+        .toc a {
+            color: #2c5282;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .step {
+            background: #e7f3ff;
+            border-left: 4px solid #5b8fa3;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #5b8fa3;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .note {
+            background: #fff9e6;
+            border-left: 4px solid #c29958;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .note::before {
+            content: "📝 補足";
+            font-weight: bold;
+            color: #c29958;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .warning {
+            background: #ffe6e6;
+            border-left: 4px solid #c76b6b;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .warning::before {
+            content: "⚠️ 注意";
+            font-weight: bold;
+            color: #c76b6b;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .image-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .image-caption {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .privacy-notice {
+            background: #ffcccc;
+            color: #cc0000;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            font-weight: bold;
+            margin-top: 5px;
+            font-style: normal;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background: #5b8fa3;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Courier New", monospace;
+        }
+
+        .button-example {
+            display: inline-block;
+            background: #5b8fa3;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin: 5px;
+        }
+
+        ul, ol {
+            padding-left: 30px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 表紙 -->
+        <div class="cover">
+            <h1>調剤券請求書作成ツール<br>操作マニュアル</h1>
+            <div class="version">バージョン 2.3.6</div>
+            <div class="date">最終更新: 2026年1月18日</div>
+        </div>
+
+        <!-- 目次 -->
+        <div class="toc no-print">
+            <h2>📑 目次</h2>
+            <ul>
+                <li><a href="#intro">1. はじめに</a></li>
+                <li><a href="#setup">2. 初回セットアップ</a></li>
+                <li><a href="#basic">3. 基本操作：請求書作成</a></li>
+                <li><a href="#advanced">4. 応用機能</a></li>
+                <li><a href="#faq">5. よくある質問</a></li>
+            </ul>
+        </div>
+
+        <!-- 1. はじめに -->
+        <h1 id="intro">1. はじめに</h1>
+
+        <h2>このツールについて</h2>
+        <p>
+            調剤券請求書作成ツールは、旭川市への生活保護調剤券請求業務を効率化するためのWebアプリケーションです。
+            インストール不要で、ブラウザ上で完結します。
+        </p>
+
+        <h3>できること</h3>
+        <ul>
+            <li>調剤券CSVファイルを読み込み、旭川市請求用Excelファイルを自動生成</li>
+            <li>患者ごとの重複チェック（同一月内の重複を自動検出）</li>
+            <li>1回目請求・2回目請求の選択</li>
+            <li>前月分データの追加（月またぎ調剤券対応）</li>
+            <li>過去の処理履歴をアーカイブとして保存・参照</li>
+        </ul>
+
+        <h3>必要な環境</h3>
+        <table>
+            <tr>
+                <th>項目</th>
+                <th>要件</th>
+            </tr>
+            <tr>
+                <td>OS</td>
+                <td>Windows 10以降</td>
+            </tr>
+            <tr>
+                <td>ブラウザ</td>
+                <td>Microsoft Edge または Google Chrome（最新版推奨）</td>
+            </tr>
+            <tr>
+                <td>必要なファイル</td>
+                <td>調剤券請求書CSV（Shift-JIS形式）</td>
+            </tr>
+        </table>
+
+        <!-- 2. 初回セットアップ -->
+        <h1 id="setup">2. 初回セットアップ</h1>
+
+        <div class="step">
+            <span class="step-number">STEP 1</span>
+            <strong>ZIPファイルを展開する</strong>
+        </div>
+
+        <p>
+            配布されたZIPファイル（<code>welfare-invoice-generator-standalone-v2.3.6.zip</code>）を右クリックし、
+            「すべて展開」を選択して任意の場所に展開してください。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 2</span>
+            <strong>index.htmlを開く</strong>
+        </div>
+
+        <p>
+            展開されたフォルダ内の<code>index.html</code>ファイルをダブルクリックしてブラウザで開きます。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/02_folder_structure.png" alt="フォルダ構成">
+            <div class="image-caption">図1: フォルダ内のファイル一覧。index.htmlをクリックして開きます。</div>
+        </div>
+
+        <div class="note">
+            ブラウザが起動しない場合は、index.htmlを右クリック→「プログラムから開く」→「Microsoft Edge」または「Google Chrome」を選択してください。
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 3</span>
+            <strong>薬局情報を設定する</strong>
+        </div>
+
+        <p>
+            初回起動時は、画面上部の「設定」タブをクリックし、薬局情報を入力します。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/04_settings_tab.png" alt="設定タブ">
+            <div class="image-caption">図2: 設定タブで薬局名と医療機関コードを入力</div>
+        </div>
+
+        <table>
+            <tr>
+                <th>項目</th>
+                <th>説明</th>
+                <th>例</th>
+            </tr>
+            <tr>
+                <td>薬局名</td>
+                <td>正式な薬局名称を入力</td>
+                <td>調剤薬局ツルハドラッグ神居３条店</td>
+            </tr>
+            <tr>
+                <td>医療機関コード</td>
+                <td>10桁の医療機関コード（下8桁が使用されます）</td>
+                <td>0131230053</td>
+            </tr>
+        </table>
+
+        <div class="warning">
+            設定情報はブラウザに保存されます。一度設定すれば、次回以降は自動的に入力されています。
+        </div>
+
+        <!-- 3. 基本操作 -->
+        <h1 id="basic">3. 基本操作：請求書作成</h1>
+
+        <div class="step">
+            <span class="step-number">STEP 1</span>
+            <strong>請求回数を選択する</strong>
+        </div>
+
+        <p>
+            「請求書作成」タブに移動し、まず画面上部のラジオボタンで<strong>1回目請求</strong>または<strong>2回目請求</strong>を選択します。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/11_batch_select.png" alt="請求回数選択">
+            <div class="image-caption">図3: 請求回数の選択（最初に選択）</div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 2</span>
+            <strong>CSVファイルを読み込む</strong>
+        </div>
+
+        <p>
+            「ファイルを選択」ボタンをクリックして、調剤券CSVファイルを選択します。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/08_file_dialog.png" alt="ファイル選択">
+            <div class="image-caption">図4: CSVファイル選択ダイアログ</div>
+        </div>
+
+        <div class="note">
+            対応ファイル形式は<code>.csv</code>のみです。Excelファイル（.xlsx）は読み込めません。
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 3-1</span>
+            <strong>患者リストを確認する（1回目）</strong>
+        </div>
+
+        <p>
+            CSVファイルが読み込まれると、旭川市の調剤券データが自動的に抽出され、患者リストとして表示されます。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/10_patient_list.png" alt="患者リスト">
+            <div class="image-caption">図5: 1回目読み込み時の患者データ一覧<br>
+            <span class="privacy-notice">※画像はイメージです。患者氏名・受給者番号・医療機関名等は自動生成されたテストデータを使用しています。</span></div>
+        </div>
+
+        <h3>表示される情報</h3>
+        <ul>
+            <li><strong>チェックボックス</strong>: 請求対象の患者を選択（デフォルトは全選択）</li>
+            <li><strong>氏名</strong>: 患者氏名（プライバシー保護のためハッシュ化）</li>
+            <li><strong>受給者番号</strong>: 生活保護受給者番号</li>
+            <li><strong>来局日</strong>: 調剤を行った日付</li>
+            <li><strong>医療機関</strong>: 処方箋を発行した医療機関名</li>
+            <li><strong>公費</strong>: 公費の種類（主保険、自立支援、重障など）</li>
+        </ul>
+
+        <div class="step">
+            <span class="step-number">STEP 3-2</span>
+            <strong>患者リストを再確認する（重複削除の確認）</strong>
+        </div>
+
+        <p>
+            患者リストを確認します。2回目請求の場合は、1回目で既に請求済みのデータが自動的に除外されています。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/10_patient_list_second.png" alt="患者リスト詳細確認">
+            <div class="image-caption">図6: データ詳細の再確認（重複除外後）<br>
+            <span class="privacy-notice">※画像はイメージです。患者氏名・受給者番号・医療機関名等は自動生成されたテストデータを使用しています。</span></div>
+        </div>
+
+        <div class="warning">
+            <strong>重複チェック機能について</strong><br>
+            同一患者（受給者番号+氏名）が同一月内に複数回来局した場合、自動的に統合されて1行で表示されます。
+            また、2回目請求時は、1回目で既に請求したデータは自動的に除外されます。
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 4</span>
+            <strong>Excelファイルをダウンロードする</strong>
+        </div>
+
+        <p>
+            データ確認が完了したら、画面下部の<span class="button-example">📥 Excelダウンロード</span>ボタンをクリックします。
+        </p>
+
+        <p>
+            ブラウザのダウンロードバーに、以下の形式でファイル名が表示されます：
+        </p>
+
+        <code>調剤券_旭川市_請求年月_薬局名_請求回数.xlsx</code>
+
+        <p>例: <code>調剤券_旭川市_2025020_調剤薬局ツルハドラッグ神居３条店_1回目.xlsx</code></p>
+
+        <div class="warning">
+            ダウンロードしたExcelファイルは、そのまま旭川市に提出できる形式になっています。
+            内容を確認後、市の指定する方法で提出してください。
+        </div>
+
+        <!-- 4. 応用機能 -->
+        <h1 id="advanced">4. 応用機能</h1>
+
+        <h2>前月分CSVの追加（月またぎ対応）</h2>
+
+        <p>
+            処方日が前月で、調剤日が当月になった場合（月またぎ調剤券）に使用します。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 1</span>
+            当月分のCSVファイルを読み込む
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 2</span>
+            「📅 前月分CSVを追加」ボタンをクリック
+        </div>
+
+        <div class="step">
+            <span class="step-number">STEP 3</span>
+            前月分のCSVファイルを選択
+        </div>
+
+        <p>
+            前月分データが追加されると、「前月分データを○件追加しました」というメッセージが表示されます。
+        </p>
+
+        <div class="note">
+            前月分データは自動的に重複チェックされます。すでに当月分に含まれているデータは除外されます。
+        </div>
+
+        <h2>アーカイブ機能</h2>
+
+        <p>
+            過去に処理したCSVファイルの履歴を確認できます。
+        </p>
+
+        <div class="image-container">
+            <img src="photo/25_archive_tab.png" alt="アーカイブタブ">
+            <div class="image-caption">図7: アーカイブタブで過去の処理履歴を確認</div>
+        </div>
+
+        <h3>アーカイブでできること</h3>
+        <ul>
+            <li>過去に処理したCSVファイル名と処理日時の確認</li>
+            <li>処理した患者データの件数確認</li>
+            <li>過去データの再読み込み（必要に応じて）</li>
+        </ul>
+
+        <div class="note">
+            アーカイブデータはブラウザのローカルストレージに保存されます。
+            ブラウザのデータを消去すると、アーカイブも削除されますのでご注意ください。
+        </div>
+
+        <!-- 5. よくある質問 -->
+        <h1 id="faq">5. よくある質問</h1>
+
+        <h2>Q1. CSVファイルを読み込んでもデータが表示されない</h2>
+        <p><strong>A1.</strong> 以下を確認してください：</p>
+        <ul>
+            <li>ファイル形式が<code>.csv</code>であることを確認</li>
+            <li>CSVファイルが正しいフォーマット（HR/R1形式）であることを確認</li>
+            <li>ファイルのエンコーディングがShift-JISであることを確認</li>
+            <li>旭川市のデータが含まれていない場合は「旭川市のデータがありません」と表示されます</li>
+        </ul>
+
+        <h2>Q2. 「医療機関コードを設定してください」というエラーが出る</h2>
+        <p><strong>A2.</strong> 設定タブで医療機関コードを入力してください。初回起動時は必ず設定が必要です。</p>
+
+        <h2>Q3. ダウンロードしたExcelファイルが開けない</h2>
+        <p><strong>A3.</strong> 以下を試してください：</p>
+        <ul>
+            <li>Microsoft Excel 2016以降がインストールされていることを確認</li>
+            <li>ファイルが破損していないか確認（再ダウンロード）</li>
+            <li>ブラウザのダウンロード設定を確認</li>
+        </ul>
+
+        <h2>Q4. 同じ患者が2回表示される</h2>
+        <p><strong>A4.</strong> 以下の可能性があります：</p>
+        <ul>
+            <li>同一患者が複数回来局した場合は、来局日ごとに統合されて1行で表示されます</li>
+            <li>受給者番号が異なる場合は別患者として扱われます</li>
+            <li>氏名の表記が異なる場合（全角/半角など）も別患者として扱われます</li>
+        </ul>
+
+        <h2>Q5. 前月分データを追加したのに件数が増えない</h2>
+        <p><strong>A5.</strong> 重複チェック機能により、すでに当月分に含まれているデータは自動的に除外されます。
+        これは正常な動作です。</p>
+
+        <h2>Q6. ブラウザを閉じたらデータが消えた</h2>
+        <p><strong>A6.</strong> 請求書作成タブのデータは一時的なものです。
+        必要な場合は必ずExcelファイルをダウンロードしてください。
+        アーカイブタブには過去の処理履歴が保存されています。</p>
+
+        <h2>Q7. 複数の薬局で使いたい</h2>
+        <p><strong>A7.</strong> 設定タブで薬局情報を切り替えることで、複数の薬局に対応できます。
+        ただし、設定情報はブラウザごとに保存されるため、別のブラウザを使用する場合は再設定が必要です。</p>
+
+        <h2>Q8. エラーが解決しない場合</h2>
+        <p><strong>A8.</strong> 以下の手順で問題を報告してください：</p>
+        <ol>
+            <li>ブラウザでF12キーを押して開発者ツールを開く</li>
+            <li>「Console」タブをクリック</li>
+            <li>エラーメッセージのスクリーンショットを撮る</li>
+            <li>開発者またはシステム管理者に問い合わせる</li>
+        </ol>
+
+        <!-- フッター -->
+        <hr style="margin-top: 60px;">
+        <p style="text-align: center; color: #999; font-size: 14px;">
+            調剤券請求書作成ツール v2.3.6 操作マニュアル<br>
+            発行日: 2026年1月18日
+        </p>
+    </div>
+</body>
+</html>

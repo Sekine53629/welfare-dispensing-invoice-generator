@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.6
+ * Version: 2.3.0
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -821,8 +821,6 @@ async function generateExcel(patients, templateBuffer) {
     // 患者データをグループ化（同一患者の複数来局日を統合）
     const groupedPatients = groupPatientsByRecipient(patients);
 
-    console.log(`患者データ書き込み開始: ${groupedPatients.length} 件`);
-
     // 患者データ書き込み（11行目から開始）
     groupedPatients.forEach((patientGroup, index) => {
         const rowNum = 11 + index;
@@ -889,102 +887,49 @@ async function generateExcel(patients, templateBuffer) {
         row.commit();
     });
 
-    console.log('患者データ書き込み完了');
+    console.log('Excel生成完了');
 
-    // v2.3.3: データ書き込み後にテーブル作成（既存ヘッダー行を利用）
+    // Excelテーブル機能を追加（v2.2.0 / v2.2.0修正版）
     // テーブル範囲: A10:M(最終行)
+    // - ヘッダー行: 10行目
+    // - データ行: 11行目から (groupedPatients.length分)
     const tableHeaderRow = 10;
     const tableDataStartRow = 11;
     const tableLastRow = tableDataStartRow + groupedPatients.length - 1;
 
-    console.log(`テーブル作成: 範囲=A${tableHeaderRow}:M${tableLastRow}, データ件数=${groupedPatients.length}`);
+    console.log(`テーブル作成準備: ヘッダー行=${tableHeaderRow}, データ開始行=${tableDataStartRow}, 最終行=${tableLastRow}, データ件数=${groupedPatients.length}`);
 
     // データが1件以上ある場合のみテーブル作成
     if (groupedPatients.length > 0) {
         try {
-            // v2.3.6: rows配列を明示的に定義してデータ行を指定
-            // ExcelJSはcolumnsだけでなくrowsも必要とする
-            const tableRows = [];
-            for (let i = 0; i < groupedPatients.length; i++) {
-                const rowNum = tableDataStartRow + i;
-                const row = worksheet.getRow(rowNum);
-                // 各セルの値を配列として取得
-                tableRows.push([
-                    row.getCell(1).value,   // 番号
-                    row.getCell(2).value,   // 調剤薬局名
-                    row.getCell(3).value,   // 調剤薬局医療機関コード
-                    row.getCell(4).value,   // 診療医療機関名
-                    row.getCell(5).value,   // 診療医療機関コード
-                    row.getCell(6).value,   // 受給者番号
-                    row.getCell(7).value,   // 氏名
-                    row.getCell(8).value,   // カナ氏名
-                    row.getCell(9).value,   // 生年月日
-                    row.getCell(10).value,  // 診療年月日
-                    row.getCell(11).value,  // 主保険
-                    row.getCell(12).value,  // 自立支援
-                    row.getCell(13).value,  // 重障
-                ]);
-            }
-
+            // 既存の10行目ヘッダーをテーブルヘッダーとして使用
+            // columns配列は省略し、既存ヘッダーをそのまま利用
             worksheet.addTable({
                 name: '調剤請求',
                 ref: `A${tableHeaderRow}:M${tableLastRow}`,
                 headerRow: true,
                 totalsRow: false,
                 style: {
-                    theme: 'TableStyleMedium6',  // 青色のテーブルデザイン（中間）6
+                    theme: 'TableStyleMedium6',
                     showRowStripes: true,
                 },
-                columns: [
-                    { name: '番号', filterButton: true },
-                    { name: '調剤薬局名', filterButton: true },
-                    { name: '調剤薬局医療機関コード', filterButton: true },
-                    { name: '診療医療機関名', filterButton: true },
-                    { name: '診療医療機関コード', filterButton: true },
-                    { name: '受給者番号', filterButton: true },
-                    { name: '氏名', filterButton: true },
-                    { name: 'カナ氏名', filterButton: true },
-                    { name: '生年月日', filterButton: true },
-                    { name: '診療年月日', filterButton: true },
-                    { name: '主保険', filterButton: true },
-                    { name: '自立支援', filterButton: true },
-                    { name: '重障', filterButton: true },
-                ],
-                rows: tableRows,  // データ行を明示的に指定
             });
-            console.log(`✅ テーブル作成完了: 調剤請求 (rows定義付き、${tableRows.length}行)`);
+            console.log(`✅ Excelテーブル追加完了: 調剤請求 (範囲: A${tableHeaderRow}:M${tableLastRow}, データ件数: ${groupedPatients.length})`);
         } catch (error) {
-            console.error('❌ テーブル作成エラー:', error);
+            console.error('❌ Excelテーブル追加エラー:', error);
             console.error('エラー詳細:', error.message);
+            console.error('エラースタック:', error.stack);
+            // テーブル追加に失敗しても処理は継続
         }
+    } else {
+        console.warn('⚠️ データが0件のためテーブルを作成しませんでした');
     }
 
-    console.log('✅ Excel生成完了（テーブル機能含む）');
-
-    // v2.3.3: テーブルXML整合性確保のため、一度書き込み→再読み込み→再書き込み
-    try {
-        console.log('テーブルXML整合性チェック中...');
-        const tempBuffer = await workbook.xlsx.writeBuffer();
-
-        // 再読み込みして整合性を確保
-        const tempWorkbook = new ExcelJS.Workbook();
-        await tempWorkbook.xlsx.load(tempBuffer);
-
-        // 最終バッファ生成
-        const finalBuffer = await tempWorkbook.xlsx.writeBuffer();
-        console.log('✅ テーブルXML整合性確認完了');
-
-        return new Blob([finalBuffer], {
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        });
-    } catch (error) {
-        console.error('❌ テーブルXML整合性チェックエラー:', error);
-        // フォールバック: 整合性チェックなしで生成
-        const buffer = await workbook.xlsx.writeBuffer();
-        return new Blob([buffer], {
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        });
-    }
+    // Blob生成
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
 }
 
 /**

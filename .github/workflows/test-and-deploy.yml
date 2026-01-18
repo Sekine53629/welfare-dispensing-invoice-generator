@@ -1,0 +1,113 @@
+name: Test and Deploy
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: |
+        cd test
+        npm install
+
+    - name: Run unit tests
+      run: |
+        cd test
+        npm test
+
+    - name: Run integration tests
+      run: |
+        cd test
+        npm run test:integration
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test/test-results/
+
+  build:
+    name: Build Standalone Package
+    needs: test
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create standalone ZIP
+      run: |
+        powershell -ExecutionPolicy Bypass -File create-standalone-zip.ps1
+
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: standalone-package
+        path: welfare-invoice-generator-standalone-v*.zip
+
+    - name: Get version
+      id: version
+      shell: powershell
+      run: |
+        $version = (Get-Content create-standalone-zip.ps1 | Select-String -Pattern 'Version: (.+)').Matches.Groups[1].Value
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: welfare-invoice-generator-standalone-v*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-code:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install ESLint
+      run: npm install -g eslint
+
+    - name: Run ESLint on standalone app
+      run: |
+        cd standalone-app
+        eslint app.js --config ../.eslintrc.json || true
+
+    - name: Check for TODO/FIXME
+      run: |
+        echo "Checking for TODO/FIXME comments..."
+        grep -rn "TODO\|FIXME" standalone-app/ webapp-version/ || echo "No TODO/FIXME found"
+
+    - name: File size check
+      run: |
+        APP_SIZE=$(stat -c%s standalone-app/app.js)
+        if [ $APP_SIZE -gt 100000 ]; then
+          echo "Warning: app.js is large ($APP_SIZE bytes)"
+        fi
