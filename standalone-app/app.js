@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.9
+ * Version: 2.3.10
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -1616,7 +1616,7 @@ function filterPreviousMonthPatients(records) {
         // 保険者番号チェック（優先）
         if (ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber)) {
             patient.isAsahikawa = true;
-            patient.isIncluded = true;  // 全て請求対象として初期選択
+            patient.isIncluded = false;  // デフォルトオフ（99%は請求済みのため）
             patient.isPreviousMonth = true;  // 前月分フラグ
             return true;
         }
@@ -1624,7 +1624,7 @@ function filterPreviousMonthPatients(records) {
         // 住所チェック（フォールバック）
         if (address.includes('旭川市')) {
             patient.isAsahikawa = true;
-            patient.isIncluded = true;
+            patient.isIncluded = false;  // デフォルトオフ
             patient.isPreviousMonth = true;
             return true;
         }
@@ -1649,11 +1649,13 @@ function displayPreviousMonthData(filteredData) {
     // 前月分データセクションを表示
     document.getElementById('previous-month-data-section').style.display = 'block';
 
-    // 統計情報更新（月遅れは全て請求対象）
+    // 統計情報更新（デフォルトオフのため、請求対象は0）
     document.getElementById('stat-previous-total').textContent = filteredData.all.length;
     document.getElementById('stat-previous-asahikawa').textContent = filteredData.asahikawa.length;
     document.getElementById('stat-previous-duplicate').textContent = '0';  // 重複チェックなし
-    document.getElementById('stat-previous-unbilled').textContent = filteredData.asahikawa.length;  // 全て請求対象
+    // 初期状態では全てチェックオフなので0件
+    const initialIncluded = filteredData.asahikawa.filter(p => p.isIncluded).length;
+    document.getElementById('stat-previous-unbilled').textContent = initialIncluded;
 
     // テーブル表示
     displayPreviousMonthTable(filteredData.asahikawa);

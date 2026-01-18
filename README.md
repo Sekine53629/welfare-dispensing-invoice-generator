@@ -1,6 +1,6 @@
 # 生活保護調剤券請求書作成システム
 
-[![Version](https://img.shields.io/badge/version-2.3.9-blue.svg)](https://github.com)
+[![Version](https://img.shields.io/badge/version-2.3.10-blue.svg)](https://github.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## 📋 概要

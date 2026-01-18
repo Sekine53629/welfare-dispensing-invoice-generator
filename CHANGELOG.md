@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.10] - 2026-01-18
+
+### Changed
+- 前月分データのチェックボックスをデフォルトオフに変更
+  - 99%のデータが請求済みと想定されるため、手動選択が必要な未請求データのみをチェック
+  - 「全選択/全解除」チェックボックスもデフォルトオフ
+  - 統計情報「請求対象」も初期状態は0件表示
+
+### Improved
+- UX改善: ユーザーが明示的に未請求データを選択する設計に変更
+
 ## [2.3.9] - 2026-01-18
 
 ### Added
