@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.6
+ * Version: 2.3.9
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -99,9 +99,6 @@ function setupEventListeners() {
 
     // 前月分全選択/全解除
     document.getElementById('select-all-previous').addEventListener('change', handleSelectAllPrevious);
-
-    // 前月分折りたたみ
-    document.getElementById('toggle-previous-month').addEventListener('click', togglePreviousMonthSection);
 }
 
 /**
@@ -663,8 +660,12 @@ function displayPatientList(patients) {
         checkbox.addEventListener('change', handleCheckboxChange);
     });
 
-    // 前月分追加ボタン表示（v2.3.0）
-    document.getElementById('previous-month-upload-section').style.display = 'block';
+    // 前月分追加ボタン表示（v2.3.7: データ読み込み後に表示）
+    const previousSection = document.getElementById('previous-month-upload-section');
+    if (previousSection) {
+        previousSection.style.display = 'block';
+        console.log('✅ 前月分CSV追加ボタンを表示しました');
+    }
 }
 
 /**
@@ -1042,13 +1043,15 @@ function handleReset() {
         currentRecords = [];
         currentFilteredPatients = null;
 
-        // 前月分データクリア（v2.3.0）
+        // 前月分データクリア（v2.3.8）
         previousMonthPatients = [];
         previousMonthFilteredData = null;
         document.getElementById('previous-csv-input').value = '';
         document.getElementById('previous-month-upload-section').style.display = 'none';
         document.getElementById('previous-month-data-section').style.display = 'none';
         document.getElementById('previous-month-table-body').innerHTML = '';
+        document.getElementById('previous-month-status').textContent = '';
+        document.getElementById('add-previous-month-btn').textContent = '📁 前月分CSVファイルを選択';
     }
 }
 
@@ -1537,30 +1540,26 @@ async function processPreviousMonthCSV(file) {
     try {
         console.log('前月分CSVファイル処理開始:', file.name);
 
-        // CSVファイル読み込み（Shift-JIS対応）
-        const csvData = await readCSVFile(file);
+        // ステータス表示
+        document.getElementById('previous-month-status').textContent = '📊 読み込み中...';
 
-        // CSV解析
-        const parsedData = Papa.parse(csvData, {
-            skipEmptyLines: true,
-        });
-
-        if (parsedData.errors.length > 0) {
-            alert('CSVファイルの解析に失敗しました。');
-            console.error('CSV解析エラー:', parsedData.errors);
-            return;
-        }
-
-        // データ変換
-        const patients = parseWelfareCSVRecords(parsedData.data);
-        console.log(`前月分CSVから ${patients.length} 件のレコードを読み込みました`);
+        // CSV解析（当月分と同じ処理）
+        const records = await parseCSVFile(file);
+        console.log(`前月分CSVから ${records.length} 件のレコードを読み込みました`);
 
         // 前月分データをフィルタ・重複チェック
-        const filteredData = filterPreviousMonthPatients(patients);
+        const filteredData = filterPreviousMonthPatients(records);
 
         // グローバル変数に保存
-        previousMonthPatients = patients;
+        previousMonthPatients = records;
         previousMonthFilteredData = filteredData;
+
+        // ステータス更新
+        document.getElementById('previous-month-status').textContent =
+            `✅ 読み込み完了: ${filteredData.asahikawa.length}件の旭川市データを抽出しました`;
+
+        // ボタンテキスト変更（追加済み表示）
+        document.getElementById('add-previous-month-btn').textContent = '✅ 前月分CSV追加済み（再選択可能）';
 
         // UI更新
         displayPreviousMonthData(filteredData);
@@ -1568,84 +1567,93 @@ async function processPreviousMonthCSV(file) {
 
         console.log('前月分データ処理完了');
     } catch (error) {
-        alert(`エラーが発生しました: ${error.message}`);
+        document.getElementById('previous-month-status').textContent =
+            `❌ エラー: ${error.message}`;
+        showError(`前月分CSVの処理中にエラーが発生しました:\n${error.message}`);
         console.error('前月分CSV処理エラー:', error);
     }
 }
 
 /**
- * 前月分患者データフィルタ・重複チェック
- * @param {Array} patients - 患者データ配列
+ * 前月分患者データフィルタ（月遅れ請求用）
+ * @param {Array} records - CSVレコード配列（当月分と同じ形式）
  * @returns {Object} フィルタ済みデータ
+ *
+ * 月遅れデータは重複チェックの対象外。
+ * 調剤日が前月のデータは、同一患者・同一医療機関でも別請求として扱う。
  */
-function filterPreviousMonthPatients(patients) {
-    const asahikawa = [];
-    const duplicate = [];
+function filterPreviousMonthPatients(records) {
+    console.log('前月分データフィルタリング開始:', records.length, '件');
 
-    // 旭川市フィルタ
-    patients.forEach(patient => {
-        if (ASAHIKAWA_INSURER_NUMBERS.includes(patient.insurerNumber)) {
-            asahikawa.push(patient);
+    // HR形式対応: ヘッダー行をスキップ（当月分と同じ処理）
+    const dataRecords = records.filter(row => {
+        const firstCol = (row['1'] || '').toString().trim();
+
+        // 項目解析結果行を除外
+        if (firstCol === '項目解析結果') return false;
+
+        // 空行を除外
+        if (firstCol === '') return false;
+
+        // データ行は元号形式で始まる（R1, H31, S64など）
+        // または数字のみ（テスト用マスキングデータ）
+        const isEraFormat = /^[RHS]\d+/.test(firstCol);  // R1, H31, S64
+        const isNumericOnly = /^\d+$/.test(firstCol);     // 1, 2, 3 (テスト用)
+
+        return isEraFormat || isNumericOnly;
+    });
+    console.log('前月分データ行抽出:', dataRecords.length, '件（ヘッダー行除外後）');
+
+    // 患者データ作成
+    const patients = dataRecords.map(row => createPatientData(row));
+    console.log('前月分患者データ作成完了:', patients.length, '件');
+
+    // 旭川市フィルタのみ実施（重複チェックなし）
+    const asahikawa = patients.filter(patient => {
+        const insurerNumber = patient.insurerNumber || '';
+        const address = patient.address || '';
+
+        // 保険者番号チェック（優先）
+        if (ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber)) {
+            patient.isAsahikawa = true;
+            patient.isIncluded = true;  // 全て請求対象として初期選択
+            patient.isPreviousMonth = true;  // 前月分フラグ
+            return true;
         }
+
+        // 住所チェック（フォールバック）
+        if (address.includes('旭川市')) {
+            patient.isAsahikawa = true;
+            patient.isIncluded = true;
+            patient.isPreviousMonth = true;
+            return true;
+        }
+
+        return false;
     });
 
-    console.log(`前月分: 旭川市抽出 ${asahikawa.length} 件`);
-
-    // 重複チェック
-    // 当月データ + localStorage既存データと照合
-    const processedKeys = getProcessedKeysForMonth();
-
-    // 当月データのキーも追加
-    if (currentFilteredPatients && currentFilteredPatients.asahikawa) {
-        currentFilteredPatients.asahikawa.forEach(patient => {
-            const yearMonth = patient.treatmentDate ? patient.treatmentDate.substring(0, 7) : '';
-            const patientNameHash = simpleHash(patient.patientName);
-            const uniqueKey = `${yearMonth}_${patientNameHash}_${patient.medicalCode}`;
-            processedKeys.add(uniqueKey);
-        });
-    }
-
-    // 重複フラグ設定
-    asahikawa.forEach(patient => {
-        const yearMonth = patient.treatmentDate ? patient.treatmentDate.substring(0, 7) : '';
-        const patientNameHash = simpleHash(patient.patientName);
-        const uniqueKey = `${yearMonth}_${patientNameHash}_${patient.medicalCode}`;
-
-        if (processedKeys.has(uniqueKey)) {
-            patient.isDuplicate = true;
-            patient.isIncluded = false;  // 重複データは初期状態でチェックオフ
-            duplicate.push(patient);
-        } else {
-            patient.isDuplicate = false;
-            patient.isIncluded = true;   // 未請求データは初期状態でチェックオン
-        }
-    });
-
-    console.log(`前月分: 重複 ${duplicate.length} 件、未請求 ${asahikawa.length - duplicate.length} 件`);
+    console.log(`前月分（月遅れ請求）: 旭川市抽出 ${asahikawa.length} 件（全て請求対象）`);
 
     return {
         all: patients,
         asahikawa: asahikawa,
-        duplicate: duplicate,
-        unbilled: asahikawa.filter(p => !p.isDuplicate)
+        duplicate: [],  // 月遅れは重複チェックしない
+        unbilled: asahikawa  // 全て未請求扱い
     };
 }
 
 /**
- * 前月分データ表示
+ * 前月分データ表示（月遅れ請求用）
  */
 function displayPreviousMonthData(filteredData) {
-    // 前月分追加セクションを非表示
-    document.getElementById('previous-month-upload-section').style.display = 'none';
-
     // 前月分データセクションを表示
     document.getElementById('previous-month-data-section').style.display = 'block';
 
-    // 統計情報更新
+    // 統計情報更新（月遅れは全て請求対象）
     document.getElementById('stat-previous-total').textContent = filteredData.all.length;
     document.getElementById('stat-previous-asahikawa').textContent = filteredData.asahikawa.length;
-    document.getElementById('stat-previous-duplicate').textContent = filteredData.duplicate.length;
-    document.getElementById('stat-previous-unbilled').textContent = filteredData.unbilled.length;
+    document.getElementById('stat-previous-duplicate').textContent = '0';  // 重複チェックなし
+    document.getElementById('stat-previous-unbilled').textContent = filteredData.asahikawa.length;  // 全て請求対象
 
     // テーブル表示
     displayPreviousMonthTable(filteredData.asahikawa);
@@ -1709,23 +1717,18 @@ function displayPreviousMonthTable(patients) {
 
         // 医療機関
         const clinicCell = document.createElement('td');
-        clinicCell.textContent = patient.clinicName || '-';
+        clinicCell.textContent = patient.medicalInstitution || '-';
         clinicCell.style.fontSize = '0.75rem';
         row.appendChild(clinicCell);
 
-        // フラグ
+        // フラグ（月遅れは全て「月遅れ請求」バッジ）
         const flagCell = document.createElement('td');
-        if (patient.isDuplicate) {
-            const dupBadge = document.createElement('span');
-            dupBadge.className = 'badge badge-danger';
-            dupBadge.textContent = '重複';
-            flagCell.appendChild(dupBadge);
-        } else {
-            const unbilledBadge = document.createElement('span');
-            unbilledBadge.className = 'badge badge-info';
-            unbilledBadge.textContent = '未請求';
-            flagCell.appendChild(unbilledBadge);
-        }
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-warning';
+        badge.textContent = '月遅れ請求';
+        badge.style.backgroundColor = '#c29958';
+        badge.style.color = 'white';
+        flagCell.appendChild(badge);
         row.appendChild(flagCell);
 
         fragment.appendChild(row);
@@ -1753,24 +1756,3 @@ function handleSelectAllPrevious(e) {
     }
 }
 
-/**
- * 前月分セクション折りたたみトグル
- */
-function togglePreviousMonthSection() {
-    const container = document.getElementById('previous-month-table-container');
-    const statsDiv = document.getElementById('previous-month-stats');
-    const selectAllDiv = container.previousElementSibling;
-    const toggleBtn = document.getElementById('toggle-previous-month');
-
-    if (container.style.display === 'none') {
-        container.style.display = 'block';
-        statsDiv.style.display = 'flex';
-        selectAllDiv.style.display = 'block';
-        toggleBtn.textContent = '▼ 折りたたむ';
-    } else {
-        container.style.display = 'none';
-        statsDiv.style.display = 'none';
-        selectAllDiv.style.display = 'none';
-        toggleBtn.textContent = '▶ 展開する';
-    }
-}

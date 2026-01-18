@@ -405,6 +405,12 @@
             gap: var(--spacing);
         }
 
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing);
+        }
+
         .patient-section {
             background: var(--color-bg);
             border-radius: var(--radius);
@@ -977,7 +983,7 @@
     <header class="app-header">
         <div class="app-header-content">
             <h1>調剤券請求書作成システム</h1>
-            <p class="subtitle">生活保護調剤券 | 旭川市請求業務支援 - スタンドアロン版 v2.3.6</p>
+            <p class="subtitle">生活保護調剤券 | 旭川市請求業務支援 - スタンドアロン版 v2.3.9</p>
         </div>
         <div class="header-actions">
             <a href="./MANUAL.html" target="_blank" rel="noopener noreferrer" class="btn-manual">
@@ -1028,15 +1034,6 @@
                         <input type="file" id="file-input" accept=".csv" style="display: none;">
                     </div>
 
-                    <!-- 前月分CSV追加 (v2.3.0) -->
-                    <div id="previous-month-upload-section" style="display: none; margin-top: 16px;">
-                        <button id="add-previous-month-btn" class="btn btn-secondary">
-                            📅 前月分CSVを追加
-                        </button>
-                        <input type="file" id="previous-csv-input" accept=".csv" style="display: none;">
-                        <p id="previous-month-status" style="margin-top: 8px; font-size: 0.9em; color: var(--color-info);"></p>
-                    </div>
-
                     <!-- プログレスバー -->
                     <div id="progress-container" style="display: none;">
                         <div class="progress-bar">
@@ -1083,14 +1080,26 @@
                 </div>
             </div>
 
+            <!-- 前月分CSV追加 (v2.3.8) -->
+            <div id="previous-month-upload-section" style="display: none; margin-bottom: 16px; padding: 16px; background: var(--color-bg); border-radius: var(--radius); border: 2px dashed var(--color-info); box-shadow: var(--shadow-sm);">
+                <p style="margin-bottom: 8px; font-weight: 500; color: var(--color-text);">📅 前月分データ（月遅れ請求）の追加</p>
+                <button id="add-previous-month-btn" class="btn btn-secondary" style="width: 100%;">
+                    📁 前月分CSVファイルを選択
+                </button>
+                <input type="file" id="previous-csv-input" accept=".csv" style="display: none;">
+                <p id="previous-month-status" style="margin-top: 8px; font-size: 0.875rem; color: var(--color-gray-700);"></p>
+            </div>
+
             <!-- メインレイアウト -->
             <div class="main-layout">
-                <!-- 左側: 患者リスト -->
-                <div class="patient-section">
-                    <div class="section-header">
-                        <h2>患者リスト</h2>
-                        <input type="text" id="search-input" class="search-input" placeholder="患者名で検索...">
-                    </div>
+                <!-- 左側カラム: 患者リスト + 前月分データ -->
+                <div class="left-column">
+                    <!-- 当月分患者リスト -->
+                    <div class="patient-section">
+                        <div class="section-header">
+                            <h2>患者リスト</h2>
+                            <input type="text" id="search-input" class="search-input" placeholder="患者名で検索...">
+                        </div>
 
                     <div class="select-all-container">
                         <label>
@@ -1119,14 +1128,74 @@
                         </table>
                     </div>
 
-                    <div class="legend">
-                        <strong>凡例:</strong>
-                        <span class="badge badge-warning">精</span>=21(精神通院)
-                        <span class="badge badge-warning">更</span>=15(更生医療)
-                        <span class="badge badge-warning">育</span>=16(育成医療)
-                        <span class="badge badge-warning">難</span>=54(難病)
-                        <span class="badge badge-success">請求</span>=請求対象
-                        <span class="badge badge-danger">重複</span>=重複除外
+                        <div class="legend">
+                            <strong>凡例:</strong>
+                            <span class="badge badge-warning">精</span>=21(精神通院)
+                            <span class="badge badge-warning">更</span>=15(更生医療)
+                            <span class="badge badge-warning">育</span>=16(育成医療)
+                            <span class="badge badge-warning">難</span>=54(難病)
+                            <span class="badge badge-success">請求</span>=請求対象
+                            <span class="badge badge-danger">重複</span>=重複除外
+                        </div>
+                    </div>
+
+                    <!-- 前月分データセクション (v2.3.7) -->
+                    <div id="previous-month-data-section" style="display: none;" class="patient-section">
+                        <div class="section-header">
+                            <h2>前月分データ（月遅れ請求）</h2>
+                        </div>
+
+                        <!-- 前月分統計情報 -->
+                        <div class="stats-compact" style="margin-bottom: 16px;">
+                            <div class="stat-item">
+                                <span class="stat-label-compact">総レコード数</span>
+                                <span id="stat-previous-total" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item highlight">
+                                <span class="stat-label-compact">旭川市抽出</span>
+                                <span id="stat-previous-asahikawa" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item warning">
+                                <span class="stat-label-compact">重複除外</span>
+                                <span id="stat-previous-duplicate" class="stat-value-compact">0</span>
+                            </div>
+                            <div class="stat-item success">
+                                <span class="stat-label-compact">請求対象</span>
+                                <span id="stat-previous-unbilled" class="stat-value-compact">0</span>
+                            </div>
+                        </div>
+
+                        <div class="select-all-container">
+                            <label>
+                                <input type="checkbox" id="select-all-previous" checked>
+                                全選択/全解除
+                            </label>
+                        </div>
+
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">✓</th>
+                                        <th>No.</th>
+                                        <th>受給者番号</th>
+                                        <th>氏名</th>
+                                        <th>生年月日</th>
+                                        <th>調剤年月日</th>
+                                        <th>医療機関</th>
+                                        <th>フラグ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previous-month-table-body">
+                                    <!-- JavaScriptで動的生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="legend">
+                            <strong>凡例:</strong>
+                            <span class="badge" style="background: #c29958; color: white;">月遅れ請求</span>=前月分データ（重複チェック対象外）
+                        </div>
                     </div>
                 </div>
 

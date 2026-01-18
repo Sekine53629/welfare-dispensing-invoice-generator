@@ -1,6 +1,6 @@
 # 生活保護調剤券請求書作成システム
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com)
+[![Version](https://img.shields.io/badge/version-2.3.9-blue.svg)](https://github.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## 📋 概要
@@ -299,6 +299,13 @@ python -m http.server 8000
 ---
 
 ## 🔄 更新履歴
+
+### v2.3.7（2026-01-18）
+- 🔧 **月遅れ請求ロジック修正** - 重複チェックを削除、全データを請求対象に
+- 📋 **月遅れバッジ追加** - 「月遅れ請求」バッジで視覚的に区別
+- 📖 **マニュアル改訂** - 月遅れ請求の正しい業務フローを反映
+- 🎨 **ヘッダーにマニュアルボタン追加** - 相対パスで別タブ表示
+- 📄 **印刷用CSS強化** - A4改ページ制御、プライバシー注釈の赤背景表示
 
 ### v2.3.6（2026-01-18）
 - ✅ **rows配列追加でテーブル作成完全解決** - `columns` + `rows`を明示的に定義
