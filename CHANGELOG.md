@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.11] - 2026-01-18
+
+### Fixed
+- **CSV文字化け（□文字）問題の解決**
+  - UTF-8/Shift-JIS の自動判定機能を実装
+  - レセコンのエンコーディングが月によって異なる問題に対応
+  - BOM検出機能追加（UTF-8 with BOM対応）
+
+### Added
+- **複数エンコーディング試行機能**
+  - 優先順位: UTF-8 (BOM付き) → UTF-8 (BOMなし) → Shift-JIS
+  - 文字化けチェック機能（□や�の検出）
+  - 自動フォールバック処理
+
+### Improved
+- **デバッグ強化**
+  - 検出されたエンコーディングをコンソールに詳細表示
+  - デコード後のテキストサンプル表示（200文字）
+  - UIにエンコーディング情報を表示（ファイル名の横）
+
 ## [2.3.10] - 2026-01-18
 
 ### Changed

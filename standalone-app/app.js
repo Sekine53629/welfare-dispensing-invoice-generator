@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.10
+ * Version: 2.3.11
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -199,7 +199,8 @@ async function processCSVFile(file) {
         document.getElementById('data-view').style.display = 'block';
 
         // ヘッダー情報更新
-        document.getElementById('current-file-name').textContent = currentCSVFile.name;
+        const encodingInfo = records._encoding ? ` (${records._encoding})` : '';
+        document.getElementById('current-file-name').textContent = currentCSVFile.name + encodingInfo;
         document.getElementById('current-batch-label').textContent =
             currentBatchNumber === 1 ? '1回目請求' : '2回目請求（重複除外）';
 
@@ -220,7 +221,8 @@ async function processCSVFile(file) {
 }
 
 /**
- * CSVパース（Shift-JIS対応）
+ * CSVパース（複数エンコーディング自動検出対応）
+ * v2.3.11: UTF-8/Shift-JIS自動判定、文字化け検出機能
  */
 async function parseCSVFile(file) {
     return new Promise((resolve, reject) => {
@@ -229,22 +231,64 @@ async function parseCSVFile(file) {
         reader.onload = (e) => {
             try {
                 const codes = new Uint8Array(e.target.result);
+                let text = null;
+                let usedEncoding = null;
 
-                // encoding-japaneseでShift-JISをUnicodeに変換
-                const detectedEncoding = Encoding.detect(codes);
-                console.log('検出されたエンコーディング:', detectedEncoding);
+                console.log('========================================');
+                console.log('📄 CSV読み込み開始:', file.name);
+                console.log('ファイルサイズ:', codes.length, 'bytes');
 
-                const unicodeArray = Encoding.convert(codes, {
-                    to: 'UNICODE',
-                    from: detectedEncoding || 'SJIS'
-                });
+                // 1. BOM検出（UTF-8 with BOM）
+                if (codes.length >= 3 && codes[0] === 0xEF && codes[1] === 0xBB && codes[2] === 0xBF) {
+                    console.log('✅ UTF-8 BOM検出');
+                    // BOMを除外してUTF-8デコード
+                    const decoder = new TextDecoder('utf-8');
+                    text = decoder.decode(codes.slice(3));
+                    usedEncoding = 'UTF-8 (BOM付き)';
+                }
+                // 2. UTF-8（BOMなし）を試行
+                else {
+                    try {
+                        const decoder = new TextDecoder('utf-8', { fatal: true });
+                        const utf8Text = decoder.decode(codes);
 
-                // Unicodeバイト配列を文字列に変換
-                const text = Encoding.codeToString(unicodeArray);
-                console.log('変換後のテキスト（最初の100文字）:', text.substring(0, 100));
+                        // 文字化けチェック（□や�が含まれていないか）
+                        if (!hasGarbledText(utf8Text)) {
+                            text = utf8Text;
+                            usedEncoding = 'UTF-8 (BOMなし)';
+                            console.log('✅ UTF-8として正常にデコード');
+                        } else {
+                            console.log('⚠️ UTF-8でデコードしたが文字化けを検出');
+                        }
+                    } catch (utf8Error) {
+                        console.log('ℹ️ UTF-8デコード失敗（不正なバイトシーケンス）');
+                    }
+                }
 
-                // 前処理なし（Papa ParseにShift-JISテキストをそのまま渡す）
-                console.log('パース前のテキスト（最初の100文字）:', text.substring(0, 100));
+                // 3. Shift-JISフォールバック
+                if (!text) {
+                    console.log('📝 Shift-JISとして処理します');
+                    const detectedEncoding = Encoding.detect(codes);
+                    console.log('encoding-japanese検出結果:', detectedEncoding);
+
+                    const unicodeArray = Encoding.convert(codes, {
+                        to: 'UNICODE',
+                        from: detectedEncoding || 'SJIS'
+                    });
+
+                    text = Encoding.codeToString(unicodeArray);
+                    usedEncoding = detectedEncoding || 'Shift-JIS (推定)';
+
+                    // Shift-JISでも文字化けチェック
+                    if (hasGarbledText(text)) {
+                        console.warn('⚠️ 警告: Shift-JISでデコードしましたが、一部文字化けの可能性があります');
+                    }
+                }
+
+                // デコード結果の確認
+                console.log('📊 使用エンコーディング:', usedEncoding);
+                console.log('変換後テキスト（最初の200文字）:', text.substring(0, 200));
+                console.log('========================================');
 
                 // Papa Parseで解析（header: false で配列として取得）
                 Papa.parse(text, {
@@ -271,17 +315,21 @@ async function parseCSVFile(file) {
                             return obj;
                         });
 
-                        console.log('CSV解析完了:', dataWithKeys.length, '件');
-                        console.log('最初の行:', dataWithKeys[0]);
+                        console.log('✅ CSV解析完了:', dataWithKeys.length, '件 (エンコーディング:', usedEncoding + ')');
+                        console.log('最初の行サンプル:', dataWithKeys[0]);
+
+                        // エンコーディング情報を結果に付加
+                        dataWithKeys._encoding = usedEncoding;
+
                         resolve(dataWithKeys);
                     },
                     error: (error) => {
-                        console.error('CSV解析エラー:', error);
+                        console.error('❌ CSV解析エラー:', error);
                         reject(error);
                     }
                 });
             } catch (error) {
-                console.error('エンコーディング変換エラー:', error);
+                console.error('❌ エンコーディング変換エラー:', error);
                 reject(error);
             }
         };
@@ -290,9 +338,29 @@ async function parseCSVFile(file) {
             reject(new Error('ファイル読み込みエラー'));
         };
 
-        // バイナリとして読み込み（Shift-JIS対応のため）
+        // バイナリとして読み込み
         reader.readAsArrayBuffer(file);
     });
+}
+
+/**
+ * 文字化けチェック（□や�の検出）
+ * @param {string} text - チェック対象テキスト
+ * @returns {boolean} 文字化けが含まれる場合true
+ */
+function hasGarbledText(text) {
+    if (!text) return true;
+
+    // 最初の1000文字をチェック（全文チェックはパフォーマンス上避ける）
+    const sample = text.substring(0, 1000);
+
+    // 文字化け判定パターン
+    // □（U+25A1）: 豆腐文字
+    // �（U+FFFD）: リプレースメント文字
+    // 連続する?（エンコーディングエラー）
+    const garbledPattern = /[\u25A1\uFFFD]|(\?{3,})/;
+
+    return garbledPattern.test(sample);
 }
 
 /**
