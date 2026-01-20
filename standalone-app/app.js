@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.11
+ * Version: 2.3.12
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -16,6 +16,13 @@ const ASAHIKAWA_INSURER_NUMBERS = ['12016010', '12012019'];
 // 前月分データ用変数（v2.3.0）
 let previousMonthPatients = [];
 let previousMonthFilteredData = null;
+
+// エンコーディング設定（v2.3.12）
+// 2026年1月以降、本番データがANSI（CP932/Shift-JIS）に変更されたため
+// 'auto': 自動検出（従来動作）
+// 'ansi-first': ANSI/Shift-JIS優先（2026年1月以降の本番データ向け）
+// 'utf8-first': UTF-8優先
+let currentEncodingMode = 'ansi-first';  // デフォルトをANSI優先に変更
 
 // テンプレートファイルは template-data.js から読み込み（TEMPLATE_BASE64定数）
 
@@ -223,6 +230,7 @@ async function processCSVFile(file) {
 /**
  * CSVパース（複数エンコーディング自動検出対応）
  * v2.3.11: UTF-8/Shift-JIS自動判定、文字化け検出機能
+ * v2.3.12: ANSI/CP932優先モード追加（2026年1月以降の本番データ対応）
  */
 async function parseCSVFile(file) {
     return new Promise((resolve, reject) => {
@@ -237,8 +245,9 @@ async function parseCSVFile(file) {
                 console.log('========================================');
                 console.log('📄 CSV読み込み開始:', file.name);
                 console.log('ファイルサイズ:', codes.length, 'bytes');
+                console.log('📋 エンコーディングモード:', currentEncodingMode);
 
-                // 1. BOM検出（UTF-8 with BOM）
+                // 1. BOM検出（UTF-8 with BOM）- 全モード共通で最優先
                 if (codes.length >= 3 && codes[0] === 0xEF && codes[1] === 0xBB && codes[2] === 0xBF) {
                     console.log('✅ UTF-8 BOM検出');
                     // BOMを除外してUTF-8デコード
@@ -246,43 +255,60 @@ async function parseCSVFile(file) {
                     text = decoder.decode(codes.slice(3));
                     usedEncoding = 'UTF-8 (BOM付き)';
                 }
-                // 2. UTF-8（BOMなし）を試行
-                else {
-                    try {
-                        const decoder = new TextDecoder('utf-8', { fatal: true });
-                        const utf8Text = decoder.decode(codes);
-
-                        // 文字化けチェック（□や�が含まれていないか）
-                        if (!hasGarbledText(utf8Text)) {
-                            text = utf8Text;
+                // モードに応じた検出順序
+                else if (currentEncodingMode === 'ansi-first') {
+                    // ANSI優先モード: Shift-JIS/CP932を先に試行
+                    text = tryDecodeAsShiftJIS(codes);
+                    if (text) {
+                        usedEncoding = 'ANSI (Shift-JIS/CP932)';
+                        console.log('✅ ANSI/Shift-JISとして正常にデコード');
+                    } else {
+                        // UTF-8フォールバック
+                        text = tryDecodeAsUTF8(codes);
+                        if (text) {
                             usedEncoding = 'UTF-8 (BOMなし)';
-                            console.log('✅ UTF-8として正常にデコード');
-                        } else {
-                            console.log('⚠️ UTF-8でデコードしたが文字化けを検出');
+                            console.log('✅ UTF-8フォールバック成功');
                         }
-                    } catch (utf8Error) {
-                        console.log('ℹ️ UTF-8デコード失敗（不正なバイトシーケンス）');
+                    }
+                }
+                else if (currentEncodingMode === 'utf8-first') {
+                    // UTF-8優先モード（従来の動作）
+                    text = tryDecodeAsUTF8(codes);
+                    if (text) {
+                        usedEncoding = 'UTF-8 (BOMなし)';
+                        console.log('✅ UTF-8として正常にデコード');
+                    } else {
+                        // Shift-JISフォールバック
+                        text = tryDecodeAsShiftJIS(codes);
+                        if (text) {
+                            usedEncoding = 'Shift-JIS (フォールバック)';
+                            console.log('✅ Shift-JISフォールバック成功');
+                        }
+                    }
+                }
+                else {
+                    // 自動検出モード: encoding-japaneseの検出結果を信頼
+                    const detectedEncoding = Encoding.detect(codes);
+                    console.log('🔍 encoding-japanese検出結果:', detectedEncoding);
+
+                    if (detectedEncoding === 'UTF8') {
+                        text = tryDecodeAsUTF8(codes);
+                        usedEncoding = 'UTF-8 (自動検出)';
+                    } else {
+                        text = tryDecodeAsShiftJIS(codes);
+                        usedEncoding = detectedEncoding ? `${detectedEncoding} (自動検出)` : 'Shift-JIS (推定)';
                     }
                 }
 
-                // 3. Shift-JISフォールバック
+                // 最終フォールバック
                 if (!text) {
-                    console.log('📝 Shift-JISとして処理します');
-                    const detectedEncoding = Encoding.detect(codes);
-                    console.log('encoding-japanese検出結果:', detectedEncoding);
-
+                    console.warn('⚠️ 全てのエンコーディング試行失敗、強制Shift-JIS変換');
                     const unicodeArray = Encoding.convert(codes, {
                         to: 'UNICODE',
-                        from: detectedEncoding || 'SJIS'
+                        from: 'SJIS'
                     });
-
                     text = Encoding.codeToString(unicodeArray);
-                    usedEncoding = detectedEncoding || 'Shift-JIS (推定)';
-
-                    // Shift-JISでも文字化けチェック
-                    if (hasGarbledText(text)) {
-                        console.warn('⚠️ 警告: Shift-JISでデコードしましたが、一部文字化けの可能性があります');
-                    }
+                    usedEncoding = 'Shift-JIS (強制変換)';
                 }
 
                 // デコード結果の確認
@@ -361,6 +387,80 @@ function hasGarbledText(text) {
     const garbledPattern = /[\u25A1\uFFFD]|(\?{3,})/;
 
     return garbledPattern.test(sample);
+}
+
+/**
+ * UTF-8としてデコードを試行
+ * @param {Uint8Array} codes - バイト配列
+ * @returns {string|null} デコード成功時はテキスト、失敗時はnull
+ */
+function tryDecodeAsUTF8(codes) {
+    try {
+        const decoder = new TextDecoder('utf-8', { fatal: true });
+        const text = decoder.decode(codes);
+
+        // 文字化けチェック
+        if (!hasGarbledText(text)) {
+            return text;
+        }
+        console.log('⚠️ UTF-8でデコードしたが文字化けを検出');
+        return null;
+    } catch (error) {
+        console.log('ℹ️ UTF-8デコード失敗（不正なバイトシーケンス）');
+        return null;
+    }
+}
+
+/**
+ * Shift-JIS/CP932としてデコードを試行
+ * @param {Uint8Array} codes - バイト配列
+ * @returns {string|null} デコード成功時はテキスト、失敗時はnull
+ */
+function tryDecodeAsShiftJIS(codes) {
+    try {
+        const detectedEncoding = Encoding.detect(codes);
+        const unicodeArray = Encoding.convert(codes, {
+            to: 'UNICODE',
+            from: detectedEncoding || 'SJIS'
+        });
+
+        const text = Encoding.codeToString(unicodeArray);
+
+        // 文字化けチェック
+        if (!hasGarbledText(text)) {
+            return text;
+        }
+        console.log('⚠️ Shift-JISでデコードしたが文字化けを検出');
+        return null;
+    } catch (error) {
+        console.log('ℹ️ Shift-JISデコード失敗:', error.message);
+        return null;
+    }
+}
+
+/**
+ * エンコーディングモードを設定
+ * @param {string} mode - 'auto' | 'ansi-first' | 'utf8-first'
+ */
+function setEncodingMode(mode) {
+    currentEncodingMode = mode;
+    console.log('📋 エンコーディングモード変更:', mode);
+
+    // 設定を保存
+    saveSettings();
+
+    // UI更新
+    updateEncodingModeDisplay();
+}
+
+/**
+ * エンコーディングモード表示を更新
+ */
+function updateEncodingModeDisplay() {
+    const radioButtons = document.querySelectorAll('input[name="encoding-mode"]');
+    radioButtons.forEach(radio => {
+        radio.checked = (radio.value === currentEncodingMode);
+    });
 }
 
 /**
@@ -1190,7 +1290,24 @@ function loadSettings() {
     document.getElementById('pharmacy-name').value = pharmacyName;
     document.getElementById('medical-code').value = medicalCode;
 
+    // エンコーディングモード読み込み（v2.3.12）
+    const savedEncodingMode = localStorage.getItem('encoding-mode');
+    if (savedEncodingMode && ['auto', 'ansi-first', 'utf8-first'].includes(savedEncodingMode)) {
+        currentEncodingMode = savedEncodingMode;
+    }
+    // UI初期化（DOMが準備できている場合）
+    setTimeout(() => {
+        updateEncodingModeDisplay();
+    }, 0);
+
     // テンプレートファイルは組み込みのため、ステータス初期化不要
+}
+
+/**
+ * 設定保存（エンコーディングモードなど）
+ */
+function saveSettings() {
+    localStorage.setItem('encoding-mode', currentEncodingMode);
 }
 
 /**

@@ -1025,6 +1025,26 @@
                         </label>
                     </div>
 
+                    <!-- エンコーディング選択 (v2.3.12) -->
+                    <div class="encoding-selector" style="margin-bottom: 16px; padding: 12px; background: var(--color-bg); border-radius: var(--radius); border: 1px solid var(--color-border);">
+                        <p style="margin-bottom: 8px; font-weight: 500; font-size: 0.875rem; color: var(--color-gray-700);">文字エンコーディング設定:</p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                            <label class="radio-label" style="font-size: 0.875rem;">
+                                <input type="radio" name="encoding-mode" value="ansi-first" checked onchange="setEncodingMode(this.value)">
+                                <span class="radio-text">ANSI優先（2026年1月～）</span>
+                            </label>
+                            <label class="radio-label" style="font-size: 0.875rem;">
+                                <input type="radio" name="encoding-mode" value="utf8-first" onchange="setEncodingMode(this.value)">
+                                <span class="radio-text">UTF-8優先（従来データ）</span>
+                            </label>
+                            <label class="radio-label" style="font-size: 0.875rem;">
+                                <input type="radio" name="encoding-mode" value="auto" onchange="setEncodingMode(this.value)">
+                                <span class="radio-text">自動検出</span>
+                            </label>
+                        </div>
+                        <p style="margin-top: 6px; font-size: 0.75rem; color: var(--color-gray-600);">※ 2026年1月から本番データがANSI形式に変更されました</p>
+                    </div>
+
                     <!-- ファイルドロップゾーン -->
                     <div id="drop-zone" class="drop-zone">
                         <div class="drop-zone-icon">▼</div>
