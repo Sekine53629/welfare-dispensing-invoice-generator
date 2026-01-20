@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.12] - 2026-01-20
+
+### Added
+- **ANSIエンコーディング優先モード**
+  - 2026年1月から本番データがANSI（BOMなしShift-JIS）形式に変更されたことに対応
+  - エンコーディング選択UI追加（ANSI優先/UTF-8優先/自動検出）
+  - 設定はlocalStorageに保存され、次回以降も維持
+
+### Fixed
+- **Encoding.detect()の誤検出問題**
+  - ANSIファイルが「UNICODE」と誤検出される問題を修正
+  - ANSI優先モードでは検出結果を無視し、強制的にShift-JISとして処理
+
+### Technical
+- Standalone版: v2.3.12
+- Webapp版: v2.1.0（encoding-japaneseライブラリ追加）
+
+---
+
 ## [2.3.11] - 2026-01-18
 
 ### Fixed
