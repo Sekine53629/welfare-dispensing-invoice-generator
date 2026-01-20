@@ -257,11 +257,12 @@ async function parseCSVFile(file) {
                 }
                 // モードに応じた検出順序
                 else if (currentEncodingMode === 'ansi-first') {
-                    // ANSI優先モード: Shift-JIS/CP932を先に試行
-                    text = tryDecodeAsShiftJIS(codes);
+                    // ANSI優先モード: 強制的にShift-JIS/CP932として処理
+                    // （Encoding.detectの誤検出を防ぐためforceShiftJIS=true）
+                    text = tryDecodeAsShiftJIS(codes, true);
                     if (text) {
-                        usedEncoding = 'ANSI (Shift-JIS/CP932)';
-                        console.log('✅ ANSI/Shift-JISとして正常にデコード');
+                        usedEncoding = 'ANSI';
+                        console.log('✅ ANSIとして正常にデコード');
                     } else {
                         // UTF-8フォールバック
                         text = tryDecodeAsUTF8(codes);
@@ -412,16 +413,30 @@ function tryDecodeAsUTF8(codes) {
 }
 
 /**
- * Shift-JIS/CP932としてデコードを試行
+ * Shift-JIS/CP932（ANSI）としてデコードを試行
  * @param {Uint8Array} codes - バイト配列
+ * @param {boolean} forceShiftJIS - 強制的にShift-JISとして処理（検出結果を無視）
  * @returns {string|null} デコード成功時はテキスト、失敗時はnull
  */
-function tryDecodeAsShiftJIS(codes) {
+function tryDecodeAsShiftJIS(codes, forceShiftJIS = false) {
     try {
-        const detectedEncoding = Encoding.detect(codes);
+        // ANSI優先モードまたは強制指定の場合、検出結果を無視してSJISとして処理
+        let fromEncoding = 'SJIS';
+
+        if (!forceShiftJIS) {
+            const detectedEncoding = Encoding.detect(codes);
+            console.log('🔍 encoding-japanese検出結果:', detectedEncoding);
+            // 検出結果がSJIS系の場合のみ使用、それ以外はSJIS強制
+            if (detectedEncoding === 'SJIS' || detectedEncoding === 'UTF8') {
+                fromEncoding = detectedEncoding;
+            }
+        }
+
+        console.log('📝 変換元エンコーディング:', fromEncoding);
+
         const unicodeArray = Encoding.convert(codes, {
             to: 'UNICODE',
-            from: detectedEncoding || 'SJIS'
+            from: fromEncoding
         });
 
         const text = Encoding.codeToString(unicodeArray);
