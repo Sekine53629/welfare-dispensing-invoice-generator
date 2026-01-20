@@ -1,6 +1,6 @@
 # 生活保護調剤券請求書作成システム
 
-[![Version](https://img.shields.io/badge/version-2.3.11-blue.svg)](https://github.com)
+[![Version](https://img.shields.io/badge/version-2.3.12-blue.svg)](https://github.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## 📋 概要
@@ -97,6 +97,24 @@ python -m http.server 8000
 **推奨**:
 - 初めての方・簡易導入 → **スタンドアロン版**
 - 組織導入・高度な機能 → **Webアプリ版**
+
+---
+
+## 🔤 文字エンコーディング対応 (v2.3.12)
+
+レセコンから出力されるCSVファイルのエンコーディングに対応：
+
+| モード | 説明 | 用途 |
+|--------|------|------|
+| **ANSI優先** | Shift-JIS/CP932として強制処理 | 2026年1月～の本番データ |
+| **UTF-8優先** | UTF-8を先に試行 | 従来データ |
+| **自動検出** | ライブラリによる自動判定 | 混在環境 |
+
+### 背景
+
+- **ANSI**: Windows日本語環境のデフォルト（= Shift-JIS/CP932、BOMなし）
+- **UTF-8 BOM付き**: ファイル先頭に `EF BB BF` のマーカーあり
+- レセコンの出力形式が時期により異なる場合があるため、手動切り替え機能を実装
 
 ---
 
