@@ -294,7 +294,7 @@
         <!-- 表紙 -->
         <div class="cover">
             <h1>調剤券請求書作成ツール<br>操作マニュアル</h1>
-            <div class="version">バージョン 2.4.0</div>
+            <div class="version">バージョン 2.5.0</div>
             <div class="date">最終更新: 2026年1月22日</div>
         </div>
 
@@ -609,12 +609,16 @@
 
         <ul>
             <li>薬局名</li>
-            <li>医療機関コード</li>
-            <li>請求年月</li>
-            <li>請求回数（1回目/2回目）</li>
+            <li>医療機関コード（014を除いた7桁）</li>
             <li>担当者氏名</li>
             <li>連絡先電話番号</li>
+            <li>メールアドレス</li>
         </ul>
+
+        <div class="image-container">
+            <img src="photo/12_form_input.png" alt="電子請求フォーム入力画面">
+            <div class="image-caption">図: 電子請求フォームの入力画面</div>
+        </div>
 
         <div class="step">
             <span class="step-number">STEP 7</span>
@@ -624,6 +628,11 @@
         <p>
             先ほどダウンロードしたExcelファイル（<code>調剤券_旭川市_請求年月_薬局名_請求回数.xlsx</code>）を、ファイル添付欄にドラッグ&ドロップまたは選択して添付します。
         </p>
+
+        <div class="image-container">
+            <img src="photo/12-2_form_input.png" alt="Excelファイル添付画面">
+            <div class="image-caption">図: ファイル添付欄</div>
+        </div>
 
         <div class="step">
             <span class="step-number">STEP 8</span>
@@ -764,7 +773,7 @@
         <!-- フッター -->
         <hr style="margin-top: 60px;">
         <p style="text-align: center; color: #999; font-size: 14px;">
-            調剤券請求書作成ツール v2.4.0 操作マニュアル<br>
+            調剤券請求書作成ツール v2.5.0 操作マニュアル<br>
             発行日: 2026年1月22日
         </p>
     </div>

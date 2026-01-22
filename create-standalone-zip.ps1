@@ -2,8 +2,8 @@
 # Version: 2.4.0
 
 $source = "standalone-app"
-$dest = "welfare-invoice-generator-standalone-v2.4.0-clean"
-$zipPath = "welfare-invoice-generator-standalone-v2.4.0.zip"
+$dest = "welfare-invoice-generator-standalone-v2.5.0-clean"
+$zipPath = "welfare-invoice-generator-standalone-v2.5.0.zip"
 
 Write-Host "=== スタンドアロン版ZIPパッケージ作成 ===" -ForegroundColor Green
 

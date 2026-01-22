@@ -1848,37 +1848,66 @@ function filterPreviousMonthPatients(records) {
     const patients = dataRecords.map(row => createPatientData(row));
     console.log('前月分患者データ作成完了:', patients.length, '件');
 
-    // 旭川市フィルタのみ実施（重複チェックなし）
+    // 処理済みキーを取得（前月1回目・2回目で請求済みのデータを判定するため）
+    const processedKeys = getProcessedKeysForMonth();
+    console.log('処理済みキー数:', processedKeys.size);
+
+    // 請求漏れ・請求済みカウンター
+    let unbilledCount = 0;
+    let alreadyBilledCount = 0;
+
+    // 旭川市フィルタ + 請求漏れ自動検出
     const asahikawa = patients.filter(patient => {
         const insurerNumber = patient.insurerNumber || '';
         const address = patient.address || '';
 
-        // 保険者番号チェック（優先）
-        if (ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber)) {
-            patient.isAsahikawa = true;
-            patient.isIncluded = false;  // デフォルトオフ（99%は請求済みのため）
-            patient.isPreviousMonth = true;  // 前月分フラグ
-            return true;
+        // 旭川市判定
+        const isAsahikawaByInsurer = ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber);
+        const isAsahikawaByAddress = address.includes('旭川市');
+
+        if (!isAsahikawaByInsurer && !isAsahikawaByAddress) {
+            return false;
         }
 
-        // 住所チェック（フォールバック）
-        if (address.includes('旭川市')) {
-            patient.isAsahikawa = true;
-            patient.isIncluded = false;  // デフォルトオフ
-            patient.isPreviousMonth = true;
-            return true;
+        // 旭川市データ
+        patient.isAsahikawa = true;
+        patient.isPreviousMonth = true;  // 前月分フラグ
+
+        // 処理済みキーと照合して請求漏れを自動検出
+        // キー形式: 年月_患者氏名ハッシュ_医療機関コード
+        const yearMonth = patient.treatmentDate ? patient.treatmentDate.substring(0, 7) : '';
+        const patientNameHash = simpleHash(patient.patientName);
+        const uniqueKey = `${yearMonth}_${patientNameHash}_${patient.medicalCode}`;
+
+        if (processedKeys.has(uniqueKey)) {
+            // 処理済み（前月1回目または2回目で請求済み）→ チェックOFF
+            patient.isIncluded = false;
+            patient.isAlreadyBilled = true;  // 請求済みフラグ
+            alreadyBilledCount++;
+            console.log(`  請求済み: ${patient.patientName} (${yearMonth}, ${patient.medicalInstitutionName})`);
+        } else {
+            // 未処理（請求漏れ）→ 自動でチェックON
+            patient.isIncluded = true;
+            patient.isAlreadyBilled = false;
+            unbilledCount++;
+            console.log(`  【請求漏れ検出】: ${patient.patientName} (${yearMonth}, ${patient.medicalInstitutionName})`);
         }
 
-        return false;
+        return true;
     });
 
-    console.log(`前月分（月遅れ請求）: 旭川市抽出 ${asahikawa.length} 件（全て請求対象）`);
+    console.log(`前月分（月遅れ請求）: 旭川市抽出 ${asahikawa.length} 件`);
+    console.log(`  - 請求漏れ（自動チェックON）: ${unbilledCount} 件`);
+    console.log(`  - 請求済み（チェックOFF）: ${alreadyBilledCount} 件`);
+
+    // 請求漏れデータのみをunbilledとして返す
+    const unbilled = asahikawa.filter(p => !p.isAlreadyBilled);
 
     return {
         all: patients,
         asahikawa: asahikawa,
-        duplicate: [],  // 月遅れは重複チェックしない
-        unbilled: asahikawa  // 全て未請求扱い
+        duplicate: asahikawa.filter(p => p.isAlreadyBilled),  // 請求済みを重複扱いで表示
+        unbilled: unbilled  // 請求漏れのみ
     };
 }
 
@@ -1889,13 +1918,17 @@ function displayPreviousMonthData(filteredData) {
     // 前月分データセクションを表示
     document.getElementById('previous-month-data-section').style.display = 'block';
 
-    // 統計情報更新（デフォルトオフのため、請求対象は0）
+    // 統計情報更新
     document.getElementById('stat-previous-total').textContent = filteredData.all.length;
     document.getElementById('stat-previous-asahikawa').textContent = filteredData.asahikawa.length;
-    document.getElementById('stat-previous-duplicate').textContent = '0';  // 重複チェックなし
-    // 初期状態では全てチェックオフなので0件
-    const initialIncluded = filteredData.asahikawa.filter(p => p.isIncluded).length;
-    document.getElementById('stat-previous-unbilled').textContent = initialIncluded;
+
+    // 請求済み件数（処理済みキーに存在したデータ）
+    const alreadyBilledCount = filteredData.asahikawa.filter(p => p.isAlreadyBilled).length;
+    document.getElementById('stat-previous-duplicate').textContent = alreadyBilledCount;
+
+    // 請求漏れ件数（自動チェックON）
+    const unbilledCount = filteredData.asahikawa.filter(p => p.isIncluded).length;
+    document.getElementById('stat-previous-unbilled').textContent = unbilledCount;
 
     // テーブル表示
     displayPreviousMonthTable(filteredData.asahikawa);
@@ -1918,6 +1951,12 @@ function displayPreviousMonthTable(patients) {
 
     patients.forEach((patient, index) => {
         const row = document.createElement('tr');
+
+        // 請求済みデータはグレーアウト表示
+        if (patient.isAlreadyBilled) {
+            row.style.backgroundColor = '#f0f0f0';
+            row.style.color = '#999';
+        }
 
         // チェックボックス
         const checkboxCell = document.createElement('td');
@@ -1963,13 +2002,21 @@ function displayPreviousMonthTable(patients) {
         clinicCell.style.fontSize = '0.75rem';
         row.appendChild(clinicCell);
 
-        // フラグ（月遅れは全て「月遅れ請求」バッジ）
+        // フラグ（請求漏れ/請求済みで表示を分ける）
         const flagCell = document.createElement('td');
         const badge = document.createElement('span');
-        badge.className = 'badge badge-warning';
-        badge.textContent = '月遅れ請求';
-        badge.style.backgroundColor = '#c29958';
-        badge.style.color = 'white';
+        badge.className = 'badge';
+        if (patient.isAlreadyBilled) {
+            // 請求済み
+            badge.textContent = '請求済み';
+            badge.style.backgroundColor = '#999';
+            badge.style.color = 'white';
+        } else {
+            // 請求漏れ（自動チェックON）
+            badge.textContent = '請求漏れ';
+            badge.style.backgroundColor = '#e74c3c';
+            badge.style.color = 'white';
+        }
         flagCell.appendChild(badge);
         row.appendChild(flagCell);
 

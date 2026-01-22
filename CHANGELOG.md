@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-01-22
+
+### Added
+- **月遅れ請求の請求漏れ自動検出機能**
+  - 前月分CSVを追加した際、処理済みキー（前月1回目・2回目で請求済み）と自動照合
+  - 請求済みデータ: チェックOFF + グレーアウト表示 + 「請求済み」バッジ（灰色）
+  - 請求漏れデータ: 自動でチェックON + 「請求漏れ」バッジ（赤色）で強調表示
+  - 統計表示を更新: 「重複除外」→「請求済み」、「請求対象」→「請求漏れ」
+
+### Technical
+- Standalone版: v2.5.0
+- Webapp版: v2.4.0
+- Test版: v2.4.0
+
+---
+
 ## [2.4.0] - 2026-01-22
 
 ### Changed
