@@ -294,8 +294,8 @@
         <!-- 表紙 -->
         <div class="cover">
             <h1>調剤券請求書作成ツール<br>操作マニュアル</h1>
-            <div class="version">バージョン 2.3.7</div>
-            <div class="date">最終更新: 2026年1月18日</div>
+            <div class="version">バージョン 2.4.0</div>
+            <div class="date">最終更新: 2026年1月22日</div>
         </div>
 
         <!-- 目次 -->
@@ -304,7 +304,13 @@
             <ul>
                 <li><a href="#intro">1. はじめに</a></li>
                 <li><a href="#setup">2. 初回セットアップ</a></li>
-                <li><a href="#basic">3. 基本操作：請求書作成</a></li>
+                <li><a href="#basic">3. 基本操作：請求書作成</a>
+                    <ul style="margin-left: 20px; font-size: 0.9em;">
+                        <li><a href="#pharnes-export">Pharnesから調剤券CSVファイルを出力する</a></li>
+                        <li><a href="#tool-create">ツールで請求書を作成する</a></li>
+                        <li><a href="#form-submit">電子請求フォームで提出する</a></li>
+                    </ul>
+                </li>
                 <li><a href="#advanced">4. 応用機能</a></li>
                 <li><a href="#faq">5. よくある質問</a></li>
             </ul>
@@ -357,7 +363,7 @@
         </div>
 
         <p>
-            配布されたZIPファイル（<code>welfare-invoice-generator-standalone-v2.3.7.zip</code>）を右クリックし、
+            配布されたZIPファイル（<code>welfare-invoice-generator-standalone-v2.4.0.zip</code>）を右クリックし、
             「すべて展開」を選択して任意の場所に展開してください。
         </p>
 
@@ -417,6 +423,69 @@
 
         <!-- 3. 基本操作 -->
         <h1 id="basic">3. 基本操作：請求書作成</h1>
+
+        <p>
+            請求書作成業務は、以下の3つのステップで行います：
+        </p>
+
+        <ol style="font-weight: bold; margin-bottom: 30px;">
+            <li>Pharnesから調剤券CSVファイルを出力する</li>
+            <li>このツールでExcelファイルを作成する</li>
+            <li>電子請求フォームで旭川市に提出する</li>
+        </ol>
+
+        <h2 id="pharnes-export">Pharnesから調剤券CSVファイルを出力する</h2>
+
+        <div class="step">
+            <span class="step-number">STEP 0-1</span>
+            <strong>Pharnesの「6.患者検索」を開く</strong>
+        </div>
+
+        <p>
+            薬局システムPharnesにログインし、メインメニューから「6.患者検索」を選択します。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 0-2</span>
+            <strong>データ期間を選択する</strong>
+        </div>
+
+        <p>
+            検索条件で、請求対象期間を設定します（例: 2026年1月1日～2026年1月31日）。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 0-3</span>
+            <strong>出力形式をCSVに変更</strong>
+        </div>
+
+        <p>
+            出力形式で「CSV」を選択します。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 0-4</span>
+            <strong>出力ファイル名を編集</strong>
+        </div>
+
+        <p>
+            ファイル名を任意の名前に変更します（例: <code>調剤券_2026年1月.csv</code>）。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 0-5</span>
+            <strong>出力を押下してダウンロード</strong>
+        </div>
+
+        <p>
+            「出力」ボタンをクリックして、CSVファイルをダウンロードします。
+        </p>
+
+        <div class="note">
+            出力されたCSVファイルは、このツールで読み込むことができます。次のステップに進みます。
+        </div>
+
+        <h2 id="tool-create">ツールで請求書を作成する</h2>
 
         <div class="step">
             <span class="step-number">STEP 1</span>
@@ -513,9 +582,71 @@
 
         <p>例: <code>調剤券_旭川市_2025020_調剤薬局ツルハドラッグ神居３条店_1回目.xlsx</code></p>
 
+        <div class="note">
+            ダウンロードしたExcelファイルは、旭川市に提出する前に内容を確認してください。次のステップで電子請求フォームに提出します。
+        </div>
+
+        <h2 id="form-submit">電子請求フォームで提出する</h2>
+
+        <div class="step">
+            <span class="step-number">STEP 5</span>
+            <strong>メイン画面右のフォームリンクを押下</strong>
+        </div>
+
+        <p>
+            ツールのメイン画面右側にある「📝 電子請求フォーム」リンクをクリックします。<br>
+            （リンク先: <a href="https://logoform.jp/form/iLZf/662007" target="_blank">https://logoform.jp/form/iLZf/662007</a>）
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 6</span>
+            <strong>必要事項を入力する</strong>
+        </div>
+
+        <p>
+            電子請求フォームで、以下の情報を入力します：
+        </p>
+
+        <ul>
+            <li>薬局名</li>
+            <li>医療機関コード</li>
+            <li>請求年月</li>
+            <li>請求回数（1回目/2回目）</li>
+            <li>担当者氏名</li>
+            <li>連絡先電話番号</li>
+        </ul>
+
+        <div class="step">
+            <span class="step-number">STEP 7</span>
+            <strong>Excelファイルを添付する</strong>
+        </div>
+
+        <p>
+            先ほどダウンロードしたExcelファイル（<code>調剤券_旭川市_請求年月_薬局名_請求回数.xlsx</code>）を、ファイル添付欄にドラッグ&ドロップまたは選択して添付します。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 8</span>
+            <strong>送信確認画面に進む</strong>
+        </div>
+
+        <p>
+            入力内容とファイルを確認し、「送信確認画面へ進む」ボタンをクリックします。
+        </p>
+
+        <div class="step">
+            <span class="step-number">STEP 9</span>
+            <strong>データを送信する</strong>
+        </div>
+
+        <p>
+            送信確認画面で内容を最終確認し、「送信する」ボタンをクリックして請求データを旭川市に提出します。
+        </p>
+
         <div class="warning">
-            ダウンロードしたExcelファイルは、そのまま旭川市に提出できる形式になっています。
-            内容を確認後、市の指定する方法で提出してください。
+            <strong>送信後の確認</strong><br>
+            送信完了画面が表示されたら、受付番号をメモまたはスクリーンショットで保存してください。<br>
+            不明な点があれば、生活支援課 医療介護係（0166-25-9121）にお問い合わせください。
         </div>
 
         <!-- 4. 応用機能 -->
@@ -633,8 +764,8 @@
         <!-- フッター -->
         <hr style="margin-top: 60px;">
         <p style="text-align: center; color: #999; font-size: 14px;">
-            調剤券請求書作成ツール v2.3.7 操作マニュアル<br>
-            発行日: 2026年1月18日
+            調剤券請求書作成ツール v2.4.0 操作マニュアル<br>
+            発行日: 2026年1月22日
         </p>
     </div>
 </body>

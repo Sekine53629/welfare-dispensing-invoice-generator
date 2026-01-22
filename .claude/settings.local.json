@@ -1,9 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(copy welfare-invoice-generator-standalone-v2.3.9.zip deploystandalone-app /Y)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(copy welfare-invoice-generator-standalone-v2.3.12.zip deploystandalone-app /Y)",
+      "Bash(git push:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"create-standalone-zip.ps1\")",
+      "Bash(powershell:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 同一患者で月を跨ぐ場合は複数行に分割
   - 今月分が先、前月分（月遅れ）が後に配置
 
+- **マニュアル大幅改定**
+  - Pharnesからの調剤券CSV出力手順を追加（STEP 0-1～0-5）
+  - Excel出力後の電子請求フォーム提出手順を追加（STEP 5～9）
+  - 通しでの作業フロー（CSV作成→Excel作成→フォーム提出）を網羅的に記載
+  - 目次に各セクションへのアンカーリンク追加
+
 ### Fixed
 - **J列参照元変更**
   - CSV 56列目（最終来局日）→ 55列目（月初来局日）に変更
