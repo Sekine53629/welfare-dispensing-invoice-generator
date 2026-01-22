@@ -1,6 +1,6 @@
 {
   "name": "welfare-invoice-generator-tests",
-  "version": "2.3.7",
+  "version": "2.4.0",
   "description": "Test suite for welfare dispensing invoice generator",
   "scripts": {
     "test": "node --test test-unit.js",
