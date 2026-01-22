@@ -5,7 +5,8 @@
       "Bash(git push:*)",
       "Bash(powershell -ExecutionPolicy Bypass -File \"create-standalone-zip.ps1\")",
       "Bash(powershell:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
