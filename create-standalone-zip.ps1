@@ -19,7 +19,6 @@ Write-Host "ファイルコピー中..." -ForegroundColor Yellow
 Copy-Item "$source\index.html" -Destination $dest
 Copy-Item "$source\app.js" -Destination $dest
 Copy-Item "$source\template-data.js" -Destination $dest
-Copy-Item "$source\README.md" -Destination $dest
 Copy-Item "$source\MANUAL.html" -Destination $dest
 Copy-Item "$source\photo" -Destination "$dest\photo" -Recurse
 
