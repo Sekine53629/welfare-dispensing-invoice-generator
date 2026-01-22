@@ -594,7 +594,7 @@ function createPatientData(row) {
     const medicalInstitution = fixKanaAndTrim(row['34'] || ''); // 34列目: 医療機関名
     const medicalCode = fixKanaAndTrim(row['65'] || '');     // 65列目: 医療機関コード
     const address = fixKanaAndTrim(row['38'] || '');         // 38列目: 住所
-    const treatmentDate = (row['56'] || '').replace(/\s/g, ''); // 56列目: 診療年月日（全スペース削除）
+    const treatmentDate = (row['55'] || '').replace(/\s/g, ''); // 55列目: 調剤年月日（月初来局日）
     const recipientNumber = fixKanaAndTrim(row['58'] || ''); // 58列目: 受給者番号
     const insurerNumber = fixKanaAndTrim(row['23'] || '');   // 23列目: 保険者番号
     const insuranceType = row['17'] || '';                    // 17列目: 保険区分（公費単独 or その他）
