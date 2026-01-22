@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * 生活保護調剤券請求書作成ツール - スタンドアロン版
- * Version: 2.3.12
+ * Version: 2.4.0
  * Description: インストール不要、ブラウザで完結する請求書作成ツール
  * ============================================================================
  */
@@ -1021,39 +1021,39 @@ async function generateExcel(patients, templateBuffer) {
         // B列: 薬局名
         row.getCell(2).value = pharmacyName || '';
 
-        // C列: 薬局医療機関コード（下8桁、文字列として代入）
+        // C列: コード（調剤薬局医療機関コード、int型8桁固定）
         const pharmacyCodeCell = row.getCell(3);
-        pharmacyCodeCell.value = formatMedicalCode(medicalCode);
-        pharmacyCodeCell.numFmt = '@'; // テキスト形式
+        pharmacyCodeCell.value = parseInt(formatMedicalCode(medicalCode), 10) || 0;
+        pharmacyCodeCell.numFmt = '00000000'; // 8桁固定
 
         // D列: 診療医療機関名
         row.getCell(4).value = removeAllQuotes(patient.medicalInstitution);
 
-        // E列: 診療医療機関コード（下8桁、文字列として代入）
+        // E列: コード（診療医療機関コード、int型8桁固定）
         const medicalCodeCell = row.getCell(5);
-        medicalCodeCell.value = formatMedicalCode(patient.medicalCode);
-        medicalCodeCell.numFmt = '@'; // テキスト形式
+        medicalCodeCell.value = parseInt(formatMedicalCode(patient.medicalCode), 10) || 0;
+        medicalCodeCell.numFmt = '00000000'; // 8桁固定
 
-        // F列: 受給者番号（文字列、シングルクォート完全除去）
+        // F列: 受給者番号（int型7桁固定）
         const recipientCell = row.getCell(6);
-        recipientCell.value = removeAllQuotes(patient.recipientNumber);
-        recipientCell.numFmt = '@'; // テキスト形式
+        recipientCell.value = parseInt(removeAllQuotes(patient.recipientNumber), 10) || 0;
+        recipientCell.numFmt = '0000000'; // 7桁固定
 
         // G列: 患者氏名（シングルクォート削除）
         row.getCell(7).value = removeAllQuotes(patient.patientName);
 
-        // H列: 患者カナ氏名（シングルクォート削除）
+        // H列: 氏名カナ（シングルクォート削除）
         row.getCell(8).value = removeAllQuotes(patient.patientKana);
 
-        // I列: 生年月日（日付として代入）
+        // I列: 生年月日（日付型シリアル値、スラッシュ区切り・ゼロ埋めなし）
         const birthDateCell = row.getCell(9);
         birthDateCell.value = parseJapaneseDate(patient.birthDate);
-        birthDateCell.numFmt = 'yyyy/mm/dd';
+        birthDateCell.numFmt = 'yyyy/m/d';
 
-        // J列: 診療年月日（複数来局日を統合）
+        // J列: 調剤年月日（月初来局日のみ、日付型）
         const treatmentDateCell = row.getCell(10);
-        treatmentDateCell.value = formatMultipleTreatmentDates(patientGroup.treatmentDates);
-        treatmentDateCell.numFmt = '@'; // テキスト形式（複数日の場合があるため）
+        treatmentDateCell.value = patientGroup.firstTreatmentDate || parseYYYYMMDD(patientGroup.treatmentDates[0]);
+        treatmentDateCell.numFmt = 'yyyy/m/d'; // 日付型、スラッシュ区切り、ゼロ埋めなし
 
         // 公費フラグ判定
         const kohiFlags = detectKohiFlags(patient.publicCodes);
@@ -1061,13 +1061,13 @@ async function generateExcel(patients, templateBuffer) {
         // 主保険判定（「公費単独」でなければ主保険あり）
         const hasMainInsurance = patient.insuranceType !== '公費単独';
 
-        // K列: 主保険（社保・国保など）
+        // K列: 社保（社保・国保など）
         row.getCell(11).value = hasMainInsurance ? '◯' : '';
 
         // L列: 自立支援（公費21/15/16）
         row.getCell(12).value = kohiFlags.hasJiritsuShien ? '◯' : '';
 
-        // M列: 重障（公費54）
+        // M列: 難病（公費54）
         row.getCell(13).value = kohiFlags.hasJusho ? '◯' : '';
 
         row.commit();
@@ -1096,17 +1096,17 @@ async function generateExcel(patients, templateBuffer) {
                 tableRows.push([
                     row.getCell(1).value,   // 番号
                     row.getCell(2).value,   // 調剤薬局名
-                    row.getCell(3).value,   // 調剤薬局医療機関コード
+                    row.getCell(3).value,   // コード（調剤薬局）
                     row.getCell(4).value,   // 診療医療機関名
-                    row.getCell(5).value,   // 診療医療機関コード
+                    row.getCell(5).value,   // コード（診療医療機関）
                     row.getCell(6).value,   // 受給者番号
                     row.getCell(7).value,   // 氏名
-                    row.getCell(8).value,   // カナ氏名
+                    row.getCell(8).value,   // 氏名カナ
                     row.getCell(9).value,   // 生年月日
-                    row.getCell(10).value,  // 診療年月日
-                    row.getCell(11).value,  // 主保険
+                    row.getCell(10).value,  // 調剤年月日
+                    row.getCell(11).value,  // 社保
                     row.getCell(12).value,  // 自立支援
-                    row.getCell(13).value,  // 重障
+                    row.getCell(13).value,  // 難病
                 ]);
             }
 
@@ -1122,17 +1122,17 @@ async function generateExcel(patients, templateBuffer) {
                 columns: [
                     { name: '番号', filterButton: true },
                     { name: '調剤薬局名', filterButton: true },
-                    { name: '調剤薬局医療機関コード', filterButton: true },
+                    { name: 'コード', filterButton: true },
                     { name: '診療医療機関名', filterButton: true },
-                    { name: '診療医療機関コード', filterButton: true },
+                    { name: 'コード', filterButton: true },
                     { name: '受給者番号', filterButton: true },
                     { name: '氏名', filterButton: true },
-                    { name: 'カナ氏名', filterButton: true },
+                    { name: '氏名カナ', filterButton: true },
                     { name: '生年月日', filterButton: true },
-                    { name: '診療年月日', filterButton: true },
-                    { name: '主保険', filterButton: true },
+                    { name: '調剤年月日', filterButton: true },
+                    { name: '社保', filterButton: true },
                     { name: '自立支援', filterButton: true },
-                    { name: '重障', filterButton: true },
+                    { name: '難病', filterButton: true },
                 ],
                 rows: tableRows,  // データ行を明示的に指定
             });
@@ -1597,9 +1597,10 @@ function parseYYYYMMDD(dateStr) {
 }
 
 /**
- * 患者データを受給者番号でグループ化（複数来局日を統合）
+ * 患者データを受給者番号＋月でグループ化（月ごとに1行、月初来局日を使用）
+ * v2.4.0: 月を跨ぐ場合は複数行に分割、今月分が先・前月分が後
  * @param {Array} patients - 患者データ配列
- * @returns {Array} グループ化されたデータ
+ * @returns {Array} グループ化されたデータ（月ごとに分割）
  */
 function groupPatientsByRecipient(patients) {
     const groups = new Map();
@@ -1608,29 +1609,68 @@ function groupPatientsByRecipient(patients) {
         // 必須データ（受給者番号・患者名）のチェック
         if (!patient.recipientNumber || !patient.patientName) {
             console.warn('必須データ不足の患者をスキップ:', patient);
-            return; // この患者は統合処理から除外
+            return;
         }
 
-        const key = `${patient.recipientNumber}_${patient.patientName}`;
+        // 調剤年月日から年月を抽出
+        const treatmentDate = patient.treatmentDate;
+        if (!treatmentDate) {
+            console.warn('調剤年月日がない患者をスキップ:', patient);
+            return;
+        }
+
+        // YYYYMMDD形式をパース
+        const parsed = parseYYYYMMDD(treatmentDate);
+        if (!(parsed instanceof Date)) {
+            console.warn('調剤年月日のパースに失敗:', treatmentDate);
+            return;
+        }
+
+        const yearMonth = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+
+        // 受給者番号 + 患者名 + 年月 でグループ化
+        const key = `${patient.recipientNumber}_${patient.patientName}_${yearMonth}`;
 
         if (!groups.has(key)) {
             groups.set(key, {
                 records: [],
-                treatmentDates: []
+                treatmentDates: [],
+                yearMonth: yearMonth,
+                firstTreatmentDate: null
             });
         }
 
         const group = groups.get(key);
         group.records.push(patient);
 
-        // 診療年月日を追加（重複排除）
-        const dateStr = patient.treatmentDate;
-        if (dateStr && !group.treatmentDates.includes(dateStr)) {
-            group.treatmentDates.push(dateStr);
+        // 調剤年月日を追加（重複排除）
+        if (!group.treatmentDates.includes(treatmentDate)) {
+            group.treatmentDates.push(treatmentDate);
         }
     });
 
-    return Array.from(groups.values());
+    // 各グループの月初来局日を決定
+    const result = Array.from(groups.values()).map(group => {
+        // 日付をソートして最初の日を取得
+        const sortedDates = group.treatmentDates
+            .map(d => ({ original: d, date: parseYYYYMMDD(d) }))
+            .filter(d => d.date instanceof Date)
+            .sort((a, b) => a.date - b.date);
+
+        if (sortedDates.length > 0) {
+            group.firstTreatmentDate = sortedDates[0].date;
+        }
+
+        return group;
+    });
+
+    // 今月分が先、前月分が後になるようにソート（年月の降順）
+    result.sort((a, b) => {
+        // 年月の降順（新しい月が先）
+        return b.yearMonth.localeCompare(a.yearMonth);
+    });
+
+    return result;
 }
 
 /**
