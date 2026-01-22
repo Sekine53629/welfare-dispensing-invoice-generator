@@ -1,6 +1,6 @@
 # 生活保護調剤券請求書作成システム
 
-[![Version](https://img.shields.io/badge/version-2.3.12-blue.svg)](https://github.com)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## 📋 概要
@@ -317,6 +317,18 @@ python -m http.server 8000
 ---
 
 ## 🔄 更新履歴
+
+### v2.4.0（2026-01-22）
+- 📊 **Excel出力仕様変更（市役所要望対応）**
+  - C列・E列: ラベル「コード」に変更、int型8桁固定
+  - F列: int型7桁固定
+  - H列: ラベル「氏名カナ」に変更
+  - I列: 日付型（シリアル値）、yyyy/m/d形式
+  - J列: ラベル「調剤年月日」、日付型、月初来局日のみ出力
+  - K列: ラベル「社保」に変更
+  - M列: ラベル「難病」に変更
+- 🔄 **月跨ぎデータ処理改善** - 同一患者で月を跨ぐ場合は複数行に分割、今月分が先・前月分が後
+- 🐛 **J列参照元変更** - CSV 56列目（最終来局日）→ 55列目（月初来局日）
 
 ### v2.3.7（2026-01-18）
 - 🔧 **月遅れ請求ロジック修正** - 重複チェックを削除、全データを請求対象に

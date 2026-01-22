@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-01-22
+
+### Changed
+- **Excel出力仕様変更（市役所要望対応）**
+  - C列・E列: ラベルを「コード」に変更、int型8桁固定
+  - F列: int型7桁固定
+  - H列: ラベルを「氏名カナ」に変更
+  - I列: 日付型（シリアル値）、yyyy/m/d形式（ゼロ埋めなし）
+  - J列: ラベルを「調剤年月日」に変更、日付型、月初来局日のみ出力
+  - K列: ラベルを「社保」に変更
+  - M列: ラベルを「難病」に変更
+
+- **月跨ぎデータ処理改善**
+  - 同一患者で月を跨ぐ場合は複数行に分割
+  - 今月分が先、前月分（月遅れ）が後に配置
+
+### Fixed
+- **J列参照元変更**
+  - CSV 56列目（最終来局日）→ 55列目（月初来局日）に変更
+  - 市役所要望: 月の最初の来局日を使用
+
+### Technical
+- Standalone版: v2.4.0
+- Webapp版: v2.4.0
+- Test版: v2.4.0
+
+---
+
 ## [2.3.12] - 2026-01-20
 
 ### Added

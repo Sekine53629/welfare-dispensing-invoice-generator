@@ -1,6 +1,6 @@
 {
   "name": "welfare-dispensing-invoice-generator-webapp",
-  "version": "2.1.0",
+  "version": "2.4.0",
   "description": "生活保護調剤券請求書自動作成ツール - Webアプリ版",
   "main": "src/js/app.js",
   "type": "module",
