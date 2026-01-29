@@ -6,7 +6,9 @@
       "Bash(powershell -ExecutionPolicy Bypass -File \"create-standalone-zip.ps1\")",
       "Bash(powershell:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(copy /Y \"c:\\\\Users\\\\imao3\\\\Documents\\\\GitHub\\\\welfare-dispensing-invoice-generator\\\\standalone-app\\\\app.js\" \"c:\\\\Users\\\\imao3\\\\Documents\\\\GitHub\\\\welfare-dispensing-invoice-generator\\\\deploy\\\\standalone-app\\\\app.js\")",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
