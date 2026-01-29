@@ -518,15 +518,17 @@ function filterPatients(records, batchNumber) {
     const asahikawa = patients.filter(patient => {
         const insurerNumber = patient.insurerNumber || '';
         const address = patient.address || '';
+        const recipientNumber = patient.recipientNumber || '';
 
-        // 保険者番号チェック（優先）
+        // 判定1: 保険者番号チェック（旭川市の保険者番号）
         if (ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber)) {
             patient.isAsahikawa = true;
             return true;
         }
 
-        // 住所チェック（フォールバック）
-        if (address.includes('旭川市')) {
+        // 判定2: 受給者番号が空欄 かつ 住所が旭川市
+        // 受給者番号未割当の旭川市在住患者を救済
+        if (!recipientNumber && address.includes('旭川市')) {
             patient.isAsahikawa = true;
             return true;
         }
@@ -1045,15 +1047,15 @@ async function generateExcel(patients, templateBuffer) {
         // H列: 氏名カナ（シングルクォート削除）
         row.getCell(8).value = removeAllQuotes(patient.patientKana);
 
-        // I列: 生年月日（日付型シリアル値、スラッシュ区切り・ゼロ埋めなし）
+        // I列: 生年月日（日付型、和暦表示）
         const birthDateCell = row.getCell(9);
         birthDateCell.value = parseJapaneseDate(patient.birthDate);
-        birthDateCell.numFmt = 'yyyy/m/d';
+        birthDateCell.numFmt = '[$-411]gee\.mm\.dd;@';
 
-        // J列: 調剤年月日（月初来局日のみ、日付型）
+        // J列: 調剤年月日（月初来局日のみ、日付型、和暦表示）
         const treatmentDateCell = row.getCell(10);
         treatmentDateCell.value = patientGroup.firstTreatmentDate || parseYYYYMMDD(patientGroup.treatmentDates[0]);
-        treatmentDateCell.numFmt = 'yyyy/m/d'; // 日付型、スラッシュ区切り、ゼロ埋めなし
+        treatmentDateCell.numFmt = '[$-411]gee\.mm\.dd;@';
 
         // 公費フラグ判定
         const kohiFlags = detectKohiFlags(patient.publicCodes);
@@ -1122,9 +1124,9 @@ async function generateExcel(patients, templateBuffer) {
                 columns: [
                     { name: '番号', filterButton: true },
                     { name: '調剤薬局名', filterButton: true },
-                    { name: 'コード', filterButton: true },
+                    { name: 'コード1', filterButton: true },
                     { name: '診療医療機関名', filterButton: true },
-                    { name: 'コード', filterButton: true },
+                    { name: 'コード2', filterButton: true },
                     { name: '受給者番号', filterButton: true },
                     { name: '氏名', filterButton: true },
                     { name: '氏名カナ', filterButton: true },
@@ -1136,6 +1138,20 @@ async function generateExcel(patients, templateBuffer) {
                 ],
                 rows: tableRows,  // データ行を明示的に指定
             });
+            // テーブルヘッダーのコード列をリッチテキストで表示（数字部分に色付け）
+            const headerRow = worksheet.getRow(tableHeaderRow);
+            headerRow.getCell(3).value = {
+                richText: [
+                    { text: 'コード' },
+                    { font: { size: 16, color: { argb: 'FF002060' }, name: 'メイリオ' }, text: '1' }
+                ]
+            };
+            headerRow.getCell(5).value = {
+                richText: [
+                    { text: 'コード' },
+                    { font: { size: 16, color: { argb: 'FFC00000' }, name: 'メイリオ' }, text: '2' }
+                ]
+            };
             console.log(`✅ テーブル作成完了: 調剤請求 (rows定義付き、${tableRows.length}行)`);
         } catch (error) {
             console.error('❌ テーブル作成エラー:', error);
@@ -1564,6 +1580,15 @@ function parseJapaneseDate(dateStr) {
         return new Date(year, parseInt(month) - 1, parseInt(day));
     }
 
+    // 漢字和暦形式のチェック（例: 昭和35年5月10日, 平成5年11月3日, 令和7年2月1日）
+    const kanjiEraMatch = str.match(/^(明治|大正|昭和|平成|令和)(\d{1,2})年(\d{1,2})月(\d{1,2})日$/);
+    if (kanjiEraMatch) {
+        const [_, era, eraYear, month, day] = kanjiEraMatch;
+        const eraOffsets = { '明治': 1867, '大正': 1911, '昭和': 1925, '平成': 1988, '令和': 2018 };
+        const year = parseInt(eraYear) + eraOffsets[era];
+        return new Date(year, parseInt(month) - 1, parseInt(day));
+    }
+
     // パースできない場合は元の文字列を返す
     return str;
 }
@@ -1606,8 +1631,9 @@ function groupPatientsByRecipient(patients) {
     const groups = new Map();
 
     patients.forEach(patient => {
-        // 必須データ（受給者番号・患者名）のチェック
-        if (!patient.recipientNumber || !patient.patientName) {
+        // 必須データ（患者名）のチェック
+        // 受給者番号は未割当の場合があるためスキップ対象外
+        if (!patient.patientName) {
             console.warn('必須データ不足の患者をスキップ:', patient);
             return;
         }
@@ -1628,8 +1654,9 @@ function groupPatientsByRecipient(patients) {
 
         const yearMonth = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
 
-        // 受給者番号 + 患者名 + 年月 でグループ化
-        const key = `${patient.recipientNumber}_${patient.patientName}_${yearMonth}`;
+        // 受給者番号 + 患者名 + 年月 + 医療機関コード でグループ化
+        // 同一患者でも異なる医療機関のデータは別グループとして扱う
+        const key = `${patient.recipientNumber}_${patient.patientName}_${yearMonth}_${patient.medicalCode}`;
 
         if (!groups.has(key)) {
             groups.set(key, {
@@ -1860,12 +1887,13 @@ function filterPreviousMonthPatients(records) {
     const asahikawa = patients.filter(patient => {
         const insurerNumber = patient.insurerNumber || '';
         const address = patient.address || '';
+        const recipientNumber = patient.recipientNumber || '';
 
-        // 旭川市判定
+        // 旭川市判定（2段階）
         const isAsahikawaByInsurer = ASAHIKAWA_INSURER_NUMBERS.includes(insurerNumber);
-        const isAsahikawaByAddress = address.includes('旭川市');
+        const isUnassignedAsahikawa = !recipientNumber && address.includes('旭川市');
 
-        if (!isAsahikawaByInsurer && !isAsahikawaByAddress) {
+        if (!isAsahikawaByInsurer && !isUnassignedAsahikawa) {
             return false;
         }
 

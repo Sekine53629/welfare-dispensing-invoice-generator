@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-01-29
+
+### Fixed
+- **旭川市フィルタの改善**
+  - 受給者番号が未割当の患者（初診等）がスキップされる問題を修正
+  - 判定ロジック: 保険者番号チェック OR (受給者番号が空 AND 住所が旭川市)
+  - `filterPatients()` / `filterPreviousMonthPatients()` の両方を修正
+
+- **生年月日の漢字和暦形式対応**
+  - `parseJapaneseDate()` が「昭和35年5月10日」形式を認識できなかった問題を修正
+  - 明治・大正・昭和・平成・令和の漢字和暦パターンを追加
+  - Excel出力時に日付シリアル値として正しく変換されるように
+
+- **Excel出力の書式改善（参照ファイル準拠）**
+  - 日付フォーマットを `[$-411]gee\.mm\.dd;@` に統一（和暦ドット区切り）
+  - テーブルヘッダー「コード1」「コード2」をリッチテキスト化（1=青、2=赤、メイリオ）
+  - カラム名を半角数字に統一（コード1/コード2）
+
+### Technical
+- Standalone版: v2.5.1
+
+---
+
 ## [2.5.0] - 2026-01-22
 
 ### Added
